@@ -52,11 +52,15 @@ Variables utiles (.env.example):
 - `SQLITE_PATH` (ex: storage/metrics.sqlite)
 - `PG_URL` ou `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE`
 - `INFLUX_URL`, `INFLUX_TOKEN`, `INFLUX_ORG`, `INFLUX_BUCKET`, `INFLUX_RANGE`
+- `ADMIN_USER`, `ADMIN_PASS` (connexion admin)
 
 Les schemas sont dans `database/`.
 
 ## Endpoints API (v1)
 - GET /api/v1/system
+- GET /api/v1/auth/me
+- POST /api/v1/auth/login
+- POST /api/v1/auth/logout
 - GET /api/v1/metrics/latest
 - GET /api/v1/metrics/history?limit=60
 - POST /api/v1/metrics
@@ -86,3 +90,4 @@ Les donnees sont stockees selon le backend:
 ## Notes
 - Les alertes sont generees automatiquement si un seuil est depasse.
 - Les commandes pompe/chauffage sont journalisees dans `storage/logs/actuators.log`.
+- Les seuils et actionneurs sont modifiables uniquement en mode admin.

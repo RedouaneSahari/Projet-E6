@@ -24,7 +24,14 @@
       <a href="#securite">Securite</a>
       <a href="#docs">Docs</a>
     </nav>
-    <div class="status-pill" data-api-status>API: en attente</div>
+    <div class="topbar-actions">
+      <div class="status-pill" data-api-status>API: en attente</div>
+      <div class="auth-actions">
+        <span class="auth-status" data-auth-status>Session: visiteur</span>
+        <button class="btn ghost small" type="button" data-auth-open>Connexion admin</button>
+        <button class="btn ghost small" type="button" data-auth-logout>Deconnexion</button>
+      </div>
+    </div>
   </header>
 
   <main>
@@ -331,7 +338,7 @@
               </div>
             </div>
             <button class="btn" type="submit">Sauvegarder</button>
-            <p class="form-hint" data-threshold-status>Seuils modifiables.</p>
+            <p class="form-hint" data-threshold-status>Connexion admin requise pour modifier.</p>
           </form>
         </div>
 
@@ -443,6 +450,27 @@
       <span>ESP32 + IoT</span>
     </div>
   </footer>
+
+  <div class="auth-modal" data-auth-modal>
+    <div class="auth-card">
+      <div class="auth-header">
+        <h3>Connexion admin</h3>
+        <button class="btn icon" type="button" data-auth-close>x</button>
+      </div>
+      <form class="auth-form" data-auth-form>
+        <label>
+          Identifiant
+          <input type="text" name="username" placeholder="admin" required />
+        </label>
+        <label>
+          Mot de passe
+          <input type="password" name="password" placeholder="admin123" required />
+        </label>
+        <button class="btn" type="submit">Se connecter</button>
+        <p class="auth-hint">Acces admin requis pour modifier les seuils et actionneurs.</p>
+      </form>
+    </div>
+  </div>
 
   <script src="./app.js" defer></script>
 </body>

@@ -3,12 +3,16 @@ const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 const { createStore } = require('./db');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const STORAGE_DIR = path.join(__dirname, 'storage');
 const LOG_DIR = path.join(STORAGE_DIR, 'logs');
 const HISTORY_LIMIT = Number(process.env.HISTORY_LIMIT || 120);
+const SESSION_COOKIE = 'e6_session';
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 
 const paths = {
   metrics: path.join(STORAGE_DIR, 'metrics.json'),
@@ -32,6 +36,7 @@ const DEFAULT_ACTUATORS = {
 };
 
 let store;
+const sessions = new Map();
 
 function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -272,6 +277,43 @@ function sendJson(res, statusCode, data) {
   res.end(payload);
 }
 
+function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  return header.split(';').reduce((acc, part) => {
+    const [key, ...rest] = part.trim().split('=');
+    if (!key) return acc;
+    acc[key] = decodeURIComponent(rest.join('='));
+    return acc;
+  }, {});
+}
+
+function createSession(res, user) {
+  const id = crypto.randomBytes(24).toString('hex');
+  sessions.set(id, user);
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${id}; HttpOnly; Path=/; SameSite=Lax`);
+  return id;
+}
+
+function clearSession(res) {
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`);
+}
+
+function getSessionUser(req) {
+  const cookies = parseCookies(req);
+  const id = cookies[SESSION_COOKIE];
+  if (!id) return null;
+  return sessions.get(id) || null;
+}
+
+function requireAdmin(req, res) {
+  const user = getSessionUser(req);
+  if (!user || user.role !== 'admin') {
+    sendJson(res, 401, { error: 'Unauthorized' });
+    return null;
+  }
+  return user;
+}
+
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -336,6 +378,41 @@ async function handleApi(req, res, urlObj) {
   const parts = urlObj.pathname.replace('/api/v1', '').split('/').filter(Boolean);
   const resource = parts[0];
 
+  if (resource === 'auth') {
+    if (req.method === 'GET' && parts[1] === 'me') {
+      const user = getSessionUser(req);
+      sendJson(res, 200, { user: user || { role: 'visitor' } });
+      return;
+    }
+
+    if (req.method === 'POST' && parts[1] === 'login') {
+      try {
+        const payload = await parseBody(req);
+        const username = String(payload.username || '').trim();
+        const password = String(payload.password || '');
+        if (!username || !password) {
+          sendJson(res, 400, { error: 'Missing credentials' });
+          return;
+        }
+        if (username === ADMIN_USER && password === ADMIN_PASS) {
+          createSession(res, { username, role: 'admin' });
+          sendJson(res, 200, { status: 'ok', user: { username, role: 'admin' } });
+          return;
+        }
+        sendJson(res, 401, { error: 'Invalid credentials' });
+      } catch (error) {
+        sendJson(res, 400, { error: error.message });
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && parts[1] === 'logout') {
+      clearSession(res);
+      sendJson(res, 200, { status: 'ok' });
+      return;
+    }
+  }
+
   if (resource === 'system' && req.method === 'GET') {
     const info = await store.info();
     sendJson(res, 200, {
@@ -387,6 +464,9 @@ async function handleApi(req, res, urlObj) {
     }
 
     if (req.method === 'POST') {
+      if (!requireAdmin(req, res)) {
+        return;
+      }
       try {
         const payload = await parseBody(req);
         const normalized = normalizeThresholds(payload);
@@ -413,6 +493,9 @@ async function handleApi(req, res, urlObj) {
     }
 
     if (req.method === 'POST') {
+      if (!requireAdmin(req, res)) {
+        return;
+      }
       try {
         const payload = await parseBody(req);
         const state = payload.state === 'on' ? 'on' : payload.state === 'off' ? 'off' : actuators[device].state;

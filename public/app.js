@@ -23,6 +23,13 @@ const systemBackend = document.querySelector('[data-system-backend]');
 const systemEngine = document.querySelector('[data-system-engine]');
 const systemStatus = document.querySelector('[data-system-status]');
 const systemMessage = document.querySelector('[data-system-message]');
+const authStatus = document.querySelector('[data-auth-status]');
+const authOpen = document.querySelector('[data-auth-open]');
+const authLogout = document.querySelector('[data-auth-logout]');
+const authModal = document.querySelector('[data-auth-modal]');
+const authClose = document.querySelector('[data-auth-close]');
+const authForm = document.querySelector('[data-auth-form]');
+let isAdmin = false;
 
 function qs(selector) {
   return document.querySelector(selector);
@@ -47,6 +54,7 @@ function setApiStatus(online, message) {
 
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, {
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
     },
@@ -147,6 +155,33 @@ function renderSystem(info) {
   if (systemMessage) {
     systemMessage.textContent = info.message || info.note || '--';
   }
+}
+
+function setControlsEnabled(enabled) {
+  document.querySelectorAll('[data-toggle], [data-mode]').forEach((btn) => {
+    btn.disabled = !enabled;
+  });
+  if (thresholdForm) {
+    thresholdForm.querySelectorAll('input, button').forEach((el) => {
+      el.disabled = !enabled;
+    });
+  }
+  if (thresholdStatus) {
+    thresholdStatus.textContent = enabled
+      ? 'Seuils modifiables (admin).'
+      : 'Connexion admin requise pour modifier.';
+  }
+  if (authLogout) {
+    authLogout.style.display = enabled ? 'inline-flex' : 'none';
+  }
+}
+
+function updateAuthUI(user) {
+  isAdmin = user && user.role === 'admin';
+  if (authStatus) {
+    authStatus.textContent = isAdmin ? `Session: ${user.username}` : 'Session: visiteur';
+  }
+  setControlsEnabled(isAdmin);
 }
 
 function renderHistory(history) {
@@ -261,6 +296,11 @@ async function fetchLogs() {
 async function fetchSystem() {
   const info = await apiRequest('/system');
   renderSystem(info);
+}
+
+async function fetchAuth() {
+  const data = await apiRequest('/auth/me');
+  updateAuthUI(data.user || { role: 'visitor' });
 }
 
 function drawChart() {
@@ -436,6 +476,51 @@ function setupControls() {
   }
 }
 
+function setupAuth() {
+  if (authOpen) {
+    authOpen.addEventListener('click', () => {
+      authModal?.classList.add('active');
+    });
+  }
+  if (authClose) {
+    authClose.addEventListener('click', () => {
+      authModal?.classList.remove('active');
+    });
+  }
+  if (authModal) {
+    authModal.addEventListener('click', (event) => {
+      if (event.target === authModal) {
+        authModal.classList.remove('active');
+      }
+    });
+  }
+  if (authForm) {
+    authForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(authForm);
+      try {
+        const result = await apiRequest('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            username: formData.get('username'),
+            password: formData.get('password'),
+          }),
+        });
+        updateAuthUI(result.user);
+        authModal?.classList.remove('active');
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+  }
+  if (authLogout) {
+    authLogout.addEventListener('click', async () => {
+      await apiRequest('/auth/logout', { method: 'POST' });
+      updateAuthUI({ role: 'visitor' });
+    });
+  }
+}
+
 function setupReveal() {
   const observer = new IntersectionObserver(
     (entries) => {
@@ -463,7 +548,9 @@ async function safeFetch(task) {
 
 async function init() {
   setupControls();
+  setupAuth();
   setupReveal();
+  await safeFetch(fetchAuth);
   await safeFetch(fetchThresholds);
   await safeFetch(fetchActuators);
   await safeFetch(fetchHistory);
