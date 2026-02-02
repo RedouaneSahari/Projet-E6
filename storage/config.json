@@ -1,0 +1,11 @@
+{
+  "siteName": "Projet E6 - Bassin Connecte",
+  "auth": {
+    "salt": "e6-salt-2026",
+    "sessionName": "e6_session"
+  },
+  "metrics": {
+    "historyLimit": 120,
+    "sampleIntervalSeconds": 10
+  }
+}

@@ -1,0 +1,98 @@
+[
+    {
+        "timestamp":  "2026-02-02T13:00:00Z",
+        "temperature":  24.2,
+        "ph":  7.4,
+        "turbidity":  14,
+        "water_level":  82,
+        "humidity":  52
+    },
+    {
+        "timestamp":  "2026-02-02T13:10:00Z",
+        "temperature":  24.5,
+        "ph":  7.39,
+        "turbidity":  15.4,
+        "water_level":  81.9,
+        "humidity":  52.8
+    },
+    {
+        "timestamp":  "2026-02-02T13:20:00Z",
+        "temperature":  24.7,
+        "ph":  7.38,
+        "turbidity":  16.5,
+        "water_level":  81.7,
+        "humidity":  53.6
+    },
+    {
+        "timestamp":  "2026-02-02T13:30:00Z",
+        "temperature":  24.9,
+        "ph":  7.35,
+        "turbidity":  17,
+        "water_level":  81.3,
+        "humidity":  54.4
+    },
+    {
+        "timestamp":  "2026-02-02T13:40:00Z",
+        "temperature":  25,
+        "ph":  7.31,
+        "turbidity":  16.7,
+        "water_level":  80.8,
+        "humidity":  55.1
+    },
+    {
+        "timestamp":  "2026-02-02T13:50:00Z",
+        "temperature":  25,
+        "ph":  7.26,
+        "turbidity":  15.8,
+        "water_level":  80.2,
+        "humidity":  55.7
+    },
+    {
+        "timestamp":  "2026-02-02T14:00:00Z",
+        "temperature":  24.9,
+        "ph":  7.21,
+        "turbidity":  14.4,
+        "water_level":  79.4,
+        "humidity":  56.2
+    },
+    {
+        "timestamp":  "2026-02-02T14:10:00Z",
+        "temperature":  24.8,
+        "ph":  7.16,
+        "turbidity":  12.9,
+        "water_level":  78.7,
+        "humidity":  56.6
+    },
+    {
+        "timestamp":  "2026-02-02T14:20:00Z",
+        "temperature":  24.6,
+        "ph":  7.12,
+        "turbidity":  11.7,
+        "water_level":  77.9,
+        "humidity":  56.9
+    },
+    {
+        "timestamp":  "2026-02-02T14:30:00Z",
+        "temperature":  24.3,
+        "ph":  7.07,
+        "turbidity":  11.1,
+        "water_level":  77.1,
+        "humidity":  57
+    },
+    {
+        "timestamp":  "2026-02-02T14:40:00Z",
+        "temperature":  24,
+        "ph":  7.04,
+        "turbidity":  11.1,
+        "water_level":  76.3,
+        "humidity":  57
+    },
+    {
+        "timestamp":  "2026-02-02T14:50:00Z",
+        "temperature":  23.8,
+        "ph":  7.02,
+        "turbidity":  11.9,
+        "water_level":  75.6,
+        "humidity":  56.8
+    }
+]

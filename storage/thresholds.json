@@ -1,0 +1,7 @@
+{
+  "temperature": { "min": 22.0, "max": 28.0, "unit": "C" },
+  "ph": { "min": 6.8, "max": 7.8 },
+  "turbidity": { "max": 22.0, "unit": "NTU" },
+  "water_level": { "min": 60.0, "max": 90.0, "unit": "%" },
+  "humidity": { "min": 35.0, "max": 70.0, "unit": "%" }
+}
