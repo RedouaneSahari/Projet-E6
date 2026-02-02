@@ -370,6 +370,30 @@ body {
   gap: 18px;
 }
 
+.admin-link {
+  display: none;
+}
+
+.admin-section {
+  display: none;
+}
+
+.admin-section.active {
+  display: block;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .module-card ul,
 .content-card ul {
   padding-left: 18px;

@@ -21,6 +21,7 @@
       <a href="#presentation">Presentation</a>
       <a href="#elements">Elements</a>
       <a href="#dashboard">Dashboard</a>
+      <a href="#admin" data-admin-link class="admin-link">Admin</a>
       <a href="#securite">Securite</a>
       <a href="#docs">Docs</a>
     </nav>
@@ -267,7 +268,7 @@
           </div>
         </div>
 
-        <div class="panel controls">
+        <div class="panel controls admin-target" id="controls">
           <div class="panel-header">
             <h3>Commandes actionneurs</h3>
             <span class="panel-sub">Mode auto ou manuel</span>
@@ -297,7 +298,7 @@
           </div>
         </div>
 
-        <div class="panel thresholds">
+        <div class="panel thresholds admin-target" id="thresholds">
           <div class="panel-header">
             <h3>Seuils & consignes</h3>
             <span class="panel-sub">Parametrage securise</span>
@@ -391,6 +392,46 @@
           </div>
           <div class="panel-footer">
             <span class="hint">Change via DATA_BACKEND (json, sqlite, postgres, influx).</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="admin" class="section reveal admin-section" data-admin-section>
+      <div class="section-header">
+        <h2>Admin</h2>
+        <p>Zone reservee a l'administration du bassin (seuils et actionneurs).</p>
+      </div>
+      <div class="admin-grid">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Actions rapides</h3>
+            <span class="panel-sub">Acces admin requis</span>
+          </div>
+          <div class="admin-actions">
+            <button class="btn" type="button" data-admin-scroll="thresholds">Modifier les seuils</button>
+            <button class="btn outline" type="button" data-admin-scroll="controls">Piloter les actionneurs</button>
+          </div>
+          <p class="form-hint">Active seulement si la session admin est ouverte.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Etat session</h3>
+            <span class="panel-sub">Role courant</span>
+          </div>
+          <div class="system-grid">
+            <div>
+              <div class="system-label">Role</div>
+              <div class="system-value" data-admin-role>Visiteur</div>
+            </div>
+            <div>
+              <div class="system-label">Acces</div>
+              <div class="system-pill" data-admin-access>Lecture seule</div>
+            </div>
+            <div>
+              <div class="system-label">Compte</div>
+              <div class="system-note" data-admin-user>Non connecte</div>
+            </div>
           </div>
         </div>
       </div>

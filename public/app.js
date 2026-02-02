@@ -29,6 +29,11 @@ const authLogout = document.querySelector('[data-auth-logout]');
 const authModal = document.querySelector('[data-auth-modal]');
 const authClose = document.querySelector('[data-auth-close]');
 const authForm = document.querySelector('[data-auth-form]');
+const adminSection = document.querySelector('[data-admin-section]');
+const adminLink = document.querySelector('[data-admin-link]');
+const adminRole = document.querySelector('[data-admin-role]');
+const adminAccess = document.querySelector('[data-admin-access]');
+const adminUser = document.querySelector('[data-admin-user]');
 let isAdmin = false;
 
 function qs(selector) {
@@ -182,6 +187,22 @@ function updateAuthUI(user) {
     authStatus.textContent = isAdmin ? `Session: ${user.username}` : 'Session: visiteur';
   }
   setControlsEnabled(isAdmin);
+  if (adminSection) {
+    adminSection.classList.toggle('active', isAdmin);
+  }
+  if (adminLink) {
+    adminLink.style.display = isAdmin ? 'inline-flex' : 'none';
+  }
+  if (adminRole) {
+    adminRole.textContent = isAdmin ? 'Admin' : 'Visiteur';
+  }
+  if (adminAccess) {
+    adminAccess.textContent = isAdmin ? 'Ecriture' : 'Lecture seule';
+    adminAccess.classList.toggle('bad', !isAdmin);
+  }
+  if (adminUser) {
+    adminUser.textContent = isAdmin ? user.username : 'Non connecte';
+  }
 }
 
 function renderHistory(history) {
@@ -458,6 +479,15 @@ function setupControls() {
       const target = btn.dataset.scroll;
       if (!target) return;
       const section = document.getElementById(target);
+      section?.scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+
+  document.querySelectorAll('[data-admin-scroll]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.adminScroll;
+      if (!target) return;
+      const section = document.querySelector(`.${target}`) || document.getElementById(target);
       section?.scrollIntoView({ behavior: 'smooth' });
     });
   });
