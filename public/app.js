@@ -29,6 +29,7 @@ const authLogout = document.querySelector('[data-auth-logout]');
 const authModal = document.querySelector('[data-auth-modal]');
 const authClose = document.querySelector('[data-auth-close]');
 const authForm = document.querySelector('[data-auth-form]');
+const authError = document.querySelector('[data-auth-error]');
 const adminSection = document.querySelector('[data-admin-section]');
 const adminLink = document.querySelector('[data-admin-link]');
 const adminRole = document.querySelector('[data-admin-role]');
@@ -187,6 +188,9 @@ function updateAuthUI(user) {
     authStatus.textContent = isAdmin ? `Session: ${user.username}` : 'Session: visiteur';
   }
   setControlsEnabled(isAdmin);
+  if (authError) {
+    authError.textContent = '';
+  }
   if (adminSection) {
     adminSection.classList.toggle('active', isAdmin);
   }
@@ -539,7 +543,11 @@ function setupAuth() {
         updateAuthUI(result.user);
         authModal?.classList.remove('active');
       } catch (error) {
-        alert(error.message);
+        if (authError) {
+          authError.textContent = error.message;
+        } else {
+          alert(error.message);
+        }
       }
     });
   }

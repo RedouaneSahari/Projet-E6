@@ -144,6 +144,10 @@ body {
   font-size: 0.85rem;
 }
 
+.auth-actions [data-auth-logout] {
+  display: none;
+}
+
 .auth-status {
   font-weight: 600;
   color: var(--ink);
@@ -721,6 +725,12 @@ body {
 .auth-hint {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.auth-error {
+  color: #b13a3a;
+  font-size: 0.85rem;
+  min-height: 18px;
 }
 
 .reveal {

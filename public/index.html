@@ -501,14 +501,15 @@
       <form class="auth-form" data-auth-form>
         <label>
           Identifiant
-          <input type="text" name="username" placeholder="admin" required />
+          <input type="text" name="username" autocomplete="username" required />
         </label>
         <label>
           Mot de passe
-          <input type="password" name="password" placeholder="admin123" required />
+          <input type="password" name="password" autocomplete="current-password" required />
         </label>
         <button class="btn" type="submit">Se connecter</button>
         <p class="auth-hint">Acces admin requis pour modifier les seuils et actionneurs.</p>
+        <p class="auth-error" data-auth-error></p>
       </form>
     </div>
   </div>
