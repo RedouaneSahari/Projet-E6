@@ -20,6 +20,15 @@ node server.js
 
 Puis ouvrir http://localhost:3000
 
+## Scripts utiles
+```
+npm run start:sqlite
+npm run start:postgres
+npm run start:influx
+npm run init:postgres
+npm run init:influx
+```
+
 ## Backend donnees (capteurs)
 Choisir le backend avec la variable d'environnement `DATA_BACKEND`:
 - `json` (par defaut)
@@ -32,6 +41,11 @@ Exemples:
 DATA_BACKEND=sqlite node server.js
 DATA_BACKEND=postgres node server.js
 DATA_BACKEND=influx node server.js
+```
+
+Sur Windows, utilisez les scripts npm ci-dessus ou:
+```
+$env:DATA_BACKEND = 'sqlite'; node server.js
 ```
 
 Variables utiles (.env.example):

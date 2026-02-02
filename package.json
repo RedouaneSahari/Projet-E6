@@ -5,10 +5,15 @@
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "start:sqlite": "node scripts/start.js sqlite",
+    "start:postgres": "node scripts/start.js postgres",
+    "start:influx": "node scripts/start.js influx",
+    "init:postgres": "node scripts/init-postgres.js",
+    "init:influx": "node scripts/init-influx.js"
   },
   "dependencies": {
-    "@influxdata/influxdb-client": "^1.37.0",
+    "@influxdata/influxdb-client": "^1.35.0",
     "pg": "^8.11.5",
     "sqlite3": "^5.1.7"
   }
