@@ -209,6 +209,12 @@ function updateActuatorUI(device, data) {
 
 async function fetchLatest() {
   const metric = await apiRequest('/metrics/latest');
+  if (!metric || !metric.timestamp) {
+    if (lastUpdateNode) {
+      lastUpdateNode.textContent = 'En attente des donnees ESP32...';
+    }
+    return;
+  }
   updateMetricUI(metric);
   state.history.push(metric);
   if (state.history.length > 120) {

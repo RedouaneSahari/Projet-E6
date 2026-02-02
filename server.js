@@ -349,10 +349,11 @@ async function handleApi(req, res, urlObj) {
 
   if (resource === 'metrics') {
     if (req.method === 'GET' && parts[1] === 'latest') {
-      const last = await store.getLatestMetric();
-      const metric = generateMetric(last || {});
-      await store.addMetric(metric);
-      updateAlerts(metric);
+      const metric = await store.getLatestMetric();
+      if (!metric) {
+        sendJson(res, 200, { status: 'empty' });
+        return;
+      }
       sendJson(res, 200, metric);
       return;
     }

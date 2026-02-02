@@ -1,3 +1,9 @@
+ESP32 - Envoi des mesures vers le serveur (HTTP POST)
+
+1) Remplacer WIFI_SSID, WIFI_PASS et API_URL
+2) Televerser ce code dans l'ESP32
+
+```
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <OneWire.h>
@@ -79,3 +85,4 @@ void loop() {
 
   delay(10000);
 }
+```
