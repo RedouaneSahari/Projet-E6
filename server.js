@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 const { createStore } = require('./db');
+const mqtt = require('mqtt');
 const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
@@ -13,6 +14,10 @@ const HISTORY_LIMIT = Number(process.env.HISTORY_LIMIT || 120);
 const SESSION_COOKIE = 'e6_session';
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
+const MQTT_ENABLED = (process.env.MQTT_ENABLED || '1') === '1';
+const MQTT_URL = process.env.MQTT_URL || 'mqtt://localhost:1883';
+const MQTT_TOPIC = process.env.MQTT_TOPIC || 'e6/bassin/metrics';
+const MQTT_CLIENT_ID = process.env.MQTT_CLIENT_ID || 'projet-e6-server';
 
 const paths = {
   metrics: path.join(STORAGE_DIR, 'metrics.json'),
@@ -37,6 +42,14 @@ const DEFAULT_ACTUATORS = {
 
 let store;
 const sessions = new Map();
+let mqttStatus = {
+  enabled: false,
+  connected: false,
+  url: MQTT_URL,
+  topic: MQTT_TOPIC,
+  lastMessage: null,
+  error: null,
+};
 
 function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -419,6 +432,7 @@ async function handleApi(req, res, urlObj) {
       backend: store.backend,
       historyLimit: store.historyLimit,
       note: store.note || null,
+      mqtt: mqttStatus,
       ...info,
     });
     return;
@@ -590,6 +604,44 @@ async function startServer() {
   server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
+
+  if (MQTT_ENABLED) {
+    mqttStatus.enabled = true;
+    const client = mqtt.connect(MQTT_URL, {
+      clientId: MQTT_CLIENT_ID,
+      reconnectPeriod: 3000,
+    });
+
+    client.on('connect', () => {
+      mqttStatus.connected = true;
+      mqttStatus.error = null;
+      client.subscribe(MQTT_TOPIC, { qos: 0 });
+      console.log(`MQTT connected: ${MQTT_URL} (topic: ${MQTT_TOPIC})`);
+    });
+
+    client.on('reconnect', () => {
+      mqttStatus.connected = false;
+    });
+
+    client.on('error', (error) => {
+      mqttStatus.error = error.message;
+      mqttStatus.connected = false;
+      console.error('MQTT error:', error.message);
+    });
+
+    client.on('message', async (topic, payload) => {
+      try {
+        const text = payload.toString('utf8');
+        const data = JSON.parse(text);
+        const metric = normalizeMetricPayload(data);
+        await store.addMetric(metric);
+        updateAlerts(metric);
+        mqttStatus.lastMessage = metric.timestamp;
+      } catch (error) {
+        mqttStatus.error = `MQTT message error: ${error.message}`;
+      }
+    });
+  }
 }
 
 startServer().catch((error) => {

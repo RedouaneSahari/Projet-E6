@@ -20,6 +20,27 @@ node server.js
 
 Puis ouvrir http://localhost:3000
 
+## MQTT (Mosquitto)
+Le serveur ecoute aussi les mesures publiees sur un broker MQTT.
+
+Topic par defaut:
+```
+e6/bassin/metrics
+```
+
+Exemple de message JSON publie:
+```
+{"temperature":24.6,"ph":7.21,"turbidity":13.8,"water_level":78.2,"humidity":52.1}
+```
+
+Variables (.env.example):
+```
+MQTT_ENABLED=1
+MQTT_URL=mqtt://localhost:1883
+MQTT_TOPIC=e6/bassin/metrics
+MQTT_CLIENT_ID=projet-e6-server
+```
+
 ## Scripts utiles
 ```
 npm run start:sqlite
@@ -64,6 +85,7 @@ Variables utiles (.env.example):
 - `PG_URL` ou `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE`
 - `INFLUX_URL`, `INFLUX_TOKEN`, `INFLUX_ORG`, `INFLUX_BUCKET`, `INFLUX_RANGE`
 - `ADMIN_USER`, `ADMIN_PASS` (connexion admin)
+- `MQTT_URL`, `MQTT_TOPIC`, `MQTT_CLIENT_ID`
 
 Les schemas sont dans `database/`.
 
