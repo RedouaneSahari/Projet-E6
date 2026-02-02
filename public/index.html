@@ -358,6 +358,34 @@
           </div>
           <div class="log-list" data-log-list></div>
         </div>
+
+        <div class="panel system">
+          <div class="panel-header">
+            <h3>Sources de donnees</h3>
+            <span class="panel-sub">Backend actif</span>
+          </div>
+          <div class="system-grid">
+            <div>
+              <div class="system-label">Backend</div>
+              <div class="system-value" data-system-backend>--</div>
+            </div>
+            <div>
+              <div class="system-label">Moteur</div>
+              <div class="system-value" data-system-engine>--</div>
+            </div>
+            <div>
+              <div class="system-label">Statut</div>
+              <div class="system-pill" data-system-status>--</div>
+            </div>
+            <div>
+              <div class="system-label">Details</div>
+              <div class="system-note" data-system-message>--</div>
+            </div>
+          </div>
+          <div class="panel-footer">
+            <span class="hint">Change via DATA_BACKEND (json, sqlite, postgres, influx).</span>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -376,7 +404,7 @@
           <p>VLAN IoT, regles firewall et isolation des flux critiques.</p>
         </div>
         <div class="content-card">
-          <h3>Tra?abilite</h3>
+          <h3>Tracabilite</h3>
           <p>Journalisation des actions et detection des anomalies.</p>
         </div>
       </div>

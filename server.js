@@ -2,11 +2,13 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
+const { createStore } = require('./db');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const STORAGE_DIR = path.join(__dirname, 'storage');
 const LOG_DIR = path.join(STORAGE_DIR, 'logs');
+const HISTORY_LIMIT = Number(process.env.HISTORY_LIMIT || 120);
 
 const paths = {
   metrics: path.join(STORAGE_DIR, 'metrics.json'),
@@ -28,6 +30,8 @@ const DEFAULT_ACTUATORS = {
   pump: { state: 'off', mode: 'auto', lastChanged: new Date().toISOString() },
   heater: { state: 'off', mode: 'auto', lastChanged: new Date().toISOString() },
 };
+
+let store;
 
 function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -70,10 +74,6 @@ function ensureSeed() {
 
   if (!fs.existsSync(paths.alerts)) {
     writeJson(paths.alerts, []);
-  }
-
-  if (!fs.existsSync(paths.metrics)) {
-    writeJson(paths.metrics, seedMetrics());
   }
 
   if (!fs.existsSync(paths.log)) {
@@ -141,6 +141,47 @@ function generateMetric(last) {
     turbidity: round(next.turbidity, 1),
     water_level: round(next.water_level, 1),
     humidity: round(next.humidity, 1),
+  };
+}
+
+function normalizeMetricPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid payload');
+  }
+
+  let timestamp = payload.timestamp || payload.time || new Date().toISOString();
+  if (typeof timestamp === 'number') {
+    timestamp = new Date(timestamp).toISOString();
+  }
+  if (Number.isNaN(Date.parse(timestamp))) {
+    throw new Error('Invalid timestamp');
+  }
+
+  const temperature = Number(payload.temperature);
+  const ph = Number(payload.ph);
+  const turbidity = Number(payload.turbidity);
+  const waterLevel = Number(payload.water_level ?? payload.waterLevel);
+  const humidity = Number(payload.humidity);
+
+  const invalid = [
+    ['temperature', temperature],
+    ['ph', ph],
+    ['turbidity', turbidity],
+    ['water_level', waterLevel],
+    ['humidity', humidity],
+  ].filter(([, value]) => !Number.isFinite(value));
+
+  if (invalid.length) {
+    throw new Error(`Invalid metrics: ${invalid.map(([key]) => key).join(', ')}`);
+  }
+
+  return {
+    timestamp,
+    temperature: round(temperature, 1),
+    ph: round(ph, 2),
+    turbidity: round(turbidity, 1),
+    water_level: round(waterLevel, 1),
+    humidity: round(humidity, 1),
   };
 }
 
@@ -295,24 +336,44 @@ async function handleApi(req, res, urlObj) {
   const parts = urlObj.pathname.replace('/api/v1', '').split('/').filter(Boolean);
   const resource = parts[0];
 
+  if (resource === 'system' && req.method === 'GET') {
+    const info = await store.info();
+    sendJson(res, 200, {
+      backend: store.backend,
+      historyLimit: store.historyLimit,
+      note: store.note || null,
+      ...info,
+    });
+    return;
+  }
+
   if (resource === 'metrics') {
     if (req.method === 'GET' && parts[1] === 'latest') {
-      const history = readJson(paths.metrics, seedMetrics());
-      const last = history[history.length - 1] || seedMetrics().slice(-1)[0];
-      const metric = generateMetric(last);
-      history.push(metric);
-      const trimmed = history.slice(-120);
-      writeJson(paths.metrics, trimmed);
+      const last = await store.getLatestMetric();
+      const metric = generateMetric(last || {});
+      await store.addMetric(metric);
       updateAlerts(metric);
       sendJson(res, 200, metric);
       return;
     }
 
     if (req.method === 'GET' && parts[1] === 'history') {
-      const history = readJson(paths.metrics, []);
       const limit = Number(urlObj.searchParams.get('limit') || 60);
-      const items = limit > 0 ? history.slice(-limit) : history;
+      const items = await store.getHistory(limit);
       sendJson(res, 200, { items });
+      return;
+    }
+
+    if (req.method === 'POST' && !parts[1]) {
+      try {
+        const payload = await parseBody(req);
+        const metric = normalizeMetricPayload(payload);
+        await store.addMetric(metric);
+        updateAlerts(metric);
+        sendJson(res, 201, { status: 'ok', metric });
+      } catch (error) {
+        sendJson(res, 400, { error: error.message });
+      }
       return;
     }
   }
@@ -424,17 +485,30 @@ function normalizeThresholds(payload) {
   return result;
 }
 
-ensureSeed();
+async function startServer() {
+  ensureSeed();
+  store = await createStore({
+    storageDir: STORAGE_DIR,
+    metricsPath: paths.metrics,
+    seedFn: seedMetrics,
+    historyLimit: HISTORY_LIMIT,
+  });
 
-const server = http.createServer(async (req, res) => {
-  const urlObj = new URL(req.url, `http://${req.headers.host}`);
-  if (urlObj.pathname.startsWith('/api/v1')) {
-    await handleApi(req, res, urlObj);
-    return;
-  }
-  serveStatic(res, urlObj.pathname);
-});
+  const server = http.createServer(async (req, res) => {
+    const urlObj = new URL(req.url, `http://${req.headers.host}`);
+    if (urlObj.pathname.startsWith('/api/v1')) {
+      await handleApi(req, res, urlObj);
+      return;
+    }
+    serveStatic(res, urlObj.pathname);
+  });
 
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  server.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });

@@ -549,6 +549,48 @@ body {
   margin-bottom: 4px;
 }
 
+.system-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.system-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.system-value {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.system-pill {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--accent-3);
+  border: 1px solid rgba(15, 118, 110, 0.3);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.system-pill.bad {
+  background: rgba(228, 72, 72, 0.12);
+  color: #b13a3a;
+  border-color: rgba(228, 72, 72, 0.35);
+}
+
+.system-note {
+  font-size: 0.85rem;
+  color: var(--muted);
+  word-break: break-word;
+}
+
 .history-table {
   display: grid;
   gap: 6px;

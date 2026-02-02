@@ -1,0 +1,35 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: projet-e6-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: projet_e6
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/postgres.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: projet-e6-influx
+    ports:
+      - '8086:8086'
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: adminadmin
+      DOCKER_INFLUXDB_INIT_ORG: projet-e6
+      DOCKER_INFLUXDB_INIT_BUCKET: aquaculture
+      DOCKER_INFLUXDB_INIT_RETENTION: 30d
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: super-secret-token
+    volumes:
+      - influx_data:/var/lib/influxdb2
+
+volumes:
+  postgres_data:
+  influx_data:

@@ -19,6 +19,10 @@ const exportBtn = document.querySelector('[data-export]');
 const refreshBtn = document.querySelector('[data-refresh]');
 const apiStatus = document.querySelector('[data-api-status]');
 const connectionNode = document.querySelector('[data-connection]');
+const systemBackend = document.querySelector('[data-system-backend]');
+const systemEngine = document.querySelector('[data-system-engine]');
+const systemStatus = document.querySelector('[data-system-status]');
+const systemMessage = document.querySelector('[data-system-message]');
 
 function qs(selector) {
   return document.querySelector(selector);
@@ -127,6 +131,24 @@ function renderAlerts(alerts) {
     .join('');
 }
 
+function renderSystem(info) {
+  if (!info) return;
+  if (systemBackend) {
+    systemBackend.textContent = info.backend || '--';
+  }
+  if (systemEngine) {
+    systemEngine.textContent = info.engine || '--';
+  }
+  if (systemStatus) {
+    const statusText = info.ok ? 'OK' : 'Erreur';
+    systemStatus.textContent = statusText;
+    systemStatus.classList.toggle('bad', !info.ok);
+  }
+  if (systemMessage) {
+    systemMessage.textContent = info.message || info.note || '--';
+  }
+}
+
 function renderHistory(history) {
   if (!historyNode) return;
   if (!history.length) {
@@ -228,6 +250,11 @@ async function fetchAlerts() {
 async function fetchLogs() {
   const data = await apiRequest('/logs/actuators');
   renderLogs(data.items || []);
+}
+
+async function fetchSystem() {
+  const info = await apiRequest('/system');
+  renderSystem(info);
 }
 
 function drawChart() {
@@ -398,6 +425,7 @@ function setupControls() {
       safeFetch(fetchLatest);
       safeFetch(fetchAlerts);
       safeFetch(fetchLogs);
+      safeFetch(fetchSystem);
     });
   }
 }
@@ -435,10 +463,12 @@ async function init() {
   await safeFetch(fetchHistory);
   await safeFetch(fetchAlerts);
   await safeFetch(fetchLogs);
+  await safeFetch(fetchSystem);
   await safeFetch(fetchLatest);
   setInterval(() => safeFetch(fetchLatest), 8000);
   setInterval(() => safeFetch(fetchAlerts), 20000);
   setInterval(() => safeFetch(fetchLogs), 25000);
+  setInterval(() => safeFetch(fetchSystem), 30000);
 }
 
 init();
