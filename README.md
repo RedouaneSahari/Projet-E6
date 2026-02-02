@@ -48,6 +48,17 @@ Sur Windows, utilisez les scripts npm ci-dessus ou:
 $env:DATA_BACKEND = 'sqlite'; node server.js
 ```
 
+## Demarrage automatique (Windows)
+Lance tout (deps, Docker, init DB, serveur):
+```
+powershell -ExecutionPolicy Bypass -File .\start-all.ps1 -Backend postgres -KillExisting
+```
+Backends possibles: `json`, `sqlite`, `postgres`, `influx`
+
+Notes:
+- Si Docker n'est pas pret, le script bascule automatiquement en `sqlite`.
+- Pour InfluxDB, definir `INFLUX_TOKEN` dans `.env` (sinon init ignore).
+
 Variables utiles (.env.example):
 - `SQLITE_PATH` (ex: storage/metrics.sqlite)
 - `PG_URL` ou `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE`
