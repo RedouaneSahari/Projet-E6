@@ -53,9 +53,6 @@ function setApiStatus(online, message) {
     apiStatus.textContent = message;
     apiStatus.classList.toggle('offline', !online);
   }
-  if (connectionNode) {
-    connectionNode.textContent = online ? 'Online' : 'Offline';
-  }
 }
 
 async function apiRequest(path, options = {}) {
@@ -87,6 +84,24 @@ function updateMetricUI(metric) {
     lastUpdateNode.textContent = `Derniere mise a jour: ${metric.timestamp}`;
   }
   applyMetricStatus(metric);
+}
+
+function setDisconnectedUI(reason) {
+  metricNodes.forEach((node) => {
+    node.textContent = '--';
+  });
+  metricCards.forEach((card) => {
+    card.classList.remove('ok', 'warn', 'critical');
+  });
+  if (lastUpdateNode) {
+    lastUpdateNode.textContent = reason || 'Non connecte';
+  }
+  if (historyNode) {
+    historyNode.innerHTML = '<p class="form-hint">Aucune mesure disponible.</p>';
+  }
+  if (connectionNode) {
+    connectionNode.textContent = 'Non connecte';
+  }
 }
 
 function applyMetricStatus(metric) {
@@ -160,6 +175,17 @@ function renderSystem(info) {
   }
   if (systemMessage) {
     systemMessage.textContent = info.message || info.note || '--';
+  }
+
+  if (connectionNode && info.mqtt) {
+    const lastMessage = info.mqtt.lastMessage ? Date.parse(info.mqtt.lastMessage) : NaN;
+    const ageMs = Number.isFinite(lastMessage) ? Date.now() - lastMessage : Infinity;
+    const recentlySeen = ageMs < 30000;
+    const connected = Boolean(info.mqtt.connected) && recentlySeen;
+    connectionNode.textContent = connected ? 'Connecte' : 'Non connecte';
+    if (!connected) {
+      setDisconnectedUI('Non connecte');
+    }
   }
 }
 
@@ -270,9 +296,7 @@ function updateActuatorUI(device, data) {
 async function fetchLatest() {
   const metric = await apiRequest('/metrics/latest');
   if (!metric || !metric.timestamp) {
-    if (lastUpdateNode) {
-      lastUpdateNode.textContent = 'En attente des donnees ESP32...';
-    }
+    setDisconnectedUI('Non connecte');
     return;
   }
   updateMetricUI(metric);

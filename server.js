@@ -50,6 +50,10 @@ let mqttStatus = {
   lastMessage: null,
   error: null,
 };
+let mqttLastLog = {
+  message: null,
+  time: 0,
+};
 
 function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -609,7 +613,7 @@ async function startServer() {
     mqttStatus.enabled = true;
     const client = mqtt.connect(MQTT_URL, {
       clientId: MQTT_CLIENT_ID,
-      reconnectPeriod: 3000,
+      reconnectPeriod: 5000,
     });
 
     client.on('connect', () => {
@@ -624,9 +628,14 @@ async function startServer() {
     });
 
     client.on('error', (error) => {
-      mqttStatus.error = error.message;
+      const message = (error && error.message) ? error.message : String(error || 'Unknown error');
+      mqttStatus.error = message;
       mqttStatus.connected = false;
-      console.error('MQTT error:', error.message);
+      const now = Date.now();
+      if (mqttLastLog.message !== message || now - mqttLastLog.time > 15000) {
+        console.error('MQTT error:', message);
+        mqttLastLog = { message, time: now };
+      }
     });
 
     client.on('message', async (topic, payload) => {

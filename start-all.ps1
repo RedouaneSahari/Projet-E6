@@ -2,7 +2,8 @@ param(
   [string]$Backend = 'postgres',
   [string]$NodePath = '',
   [int]$Port = 3000,
-  [switch]$KillExisting
+  [switch]$KillExisting,
+  [string]$DockerPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -45,6 +46,31 @@ function Resolve-NodeBin {
   return $null
 }
 
+function Resolve-DockerBin {
+  if ($DockerPath) {
+    if (Test-Path $DockerPath) {
+      if ($DockerPath.ToLower().EndsWith('docker.exe')) {
+        return (Split-Path $DockerPath -Parent)
+      }
+      if (Test-Path (Join-Path $DockerPath 'docker.exe')) {
+        return $DockerPath
+      }
+    }
+  }
+
+  $candidates = @(
+    "$env:ProgramFiles\Docker\Docker\resources\bin"
+  )
+
+  foreach ($dir in $candidates) {
+    if ($dir -and (Test-Path (Join-Path $dir 'docker.exe'))) {
+      return $dir
+    }
+  }
+
+  return $null
+}
+
 function Get-PortProcessId($port) {
   $netstat = netstat -ano | Select-String -Pattern ":$port\s" | Select-Object -First 1
   if (-not $netstat) { return $null }
@@ -79,6 +105,12 @@ if ($pidOnPort) {
   }
 }
 
+$dockerDir = Resolve-DockerBin
+if ($dockerDir) {
+  $env:Path = "$dockerDir;$env:Path"
+  Write-Host "Using Docker from: $dockerDir"
+}
+
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
   Write-Warning "Docker not found. Skipping Postgres/Influx and falling back to sqlite."
   $Backend = 'sqlite'
@@ -91,13 +123,15 @@ Write-Section "Starting Docker services"
 $composeCmd = if (Get-Command docker-compose -ErrorAction SilentlyContinue) { 'docker-compose' } else { 'docker compose' }
 
 $dockerReady = $false
-for ($i = 0; $i -lt 10; $i++) {
-  try {
-    docker info | Out-Null
-    $dockerReady = $true
-    break
-  } catch {
-    Start-Sleep -Seconds 3
+if (Get-Command docker -ErrorAction SilentlyContinue) {
+  for ($i = 0; $i -lt 10; $i++) {
+    try {
+      docker info | Out-Null
+      $dockerReady = $true
+      break
+    } catch {
+      Start-Sleep -Seconds 3
+    }
   }
 }
 
