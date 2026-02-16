@@ -3,19 +3,18 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-// === A REMPLACER ===
-const char* WIFI_SSID = "YOUR_SSID";
-const char* WIFI_PASS = "YOUR_PASSWORD";
-// IP du PC qui heberge le broker Mosquitto (meme reseau que l'ESP32)
-const char* MQTT_HOST = "YOUR_PC_IP";
+
+const char* WIFI_SSID = "CFAINSTA-STUDENTS";
+const char* WIFI_PASS = "Cf@InSt@-$tUd3nT";
+const char* MQTT_HOST = "172.16.8.82";
 const int MQTT_PORT = 1883;
 const char* MQTT_TOPIC = "e6/bassin/metrics";
 
-// === CAPTEURS ===
-const int ONE_WIRE_BUS = 4;  // DS18B20
-const int PH_PIN = 34;       // capteur pH (analog)
-const int TURB_PIN = 35;     // capteur turbidite (analog)
-const int LEVEL_PIN = 32;    // capteur niveau d'eau (analog)
+
+const int ONE_WIRE_BUS = 4; 
+const int PH_PIN = 34;       
+const int TURB_PIN = 35;     
+const int LEVEL_PIN = 32;    
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
@@ -24,17 +23,17 @@ DallasTemperature sensors(&oneWire);
 
 float readPH() {
   int raw = analogRead(PH_PIN);
-  return (raw / 4095.0) * 14.0; // a calibrer
+  return (raw / 4095.0) * 14.0; 
 }
 
 float readTurbidity() {
   int raw = analogRead(TURB_PIN);
-  return (raw / 4095.0) * 40.0; // a calibrer
+  return (raw / 4095.0) * 40.0; 
 }
 
 float readWaterLevel() {
   int raw = analogRead(LEVEL_PIN);
-  return (raw / 4095.0) * 100.0; // 0-100%
+  return (raw / 4095.0) * 100.0; 
 }
 
 float readHumidity() {
