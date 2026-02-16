@@ -7,7 +7,7 @@
 const char* WIFI_SSID = "YOUR_SSID";
 const char* WIFI_PASS = "YOUR_PASSWORD";
 // IP du PC qui heberge le broker Mosquitto (meme reseau que l'ESP32)
-const char* MQTT_HOST = "192.168.1.10";
+const char* MQTT_HOST = "YOUR_PC_IP";
 const int MQTT_PORT = 1883;
 const char* MQTT_TOPIC = "e6/bassin/metrics";
 

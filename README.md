@@ -13,12 +13,38 @@ Dashboard web pour la supervision d'un bassin aquacole connecte (RAS miniaturise
 npm install
 ```
 
+## Demarrage complet avec Docker (ESP32 + MQTT + site)
+Lance toute la stack avec une seule commande:
+```
+docker compose up -d --build
+```
+
+Services demarres:
+- `projet-e6-app` (site + API) sur `http://localhost:3000`
+- `projet-e6-mosquitto` (broker MQTT) sur `1883`
+- `projet-e6-postgres` sur `5432`
+- `projet-e6-influx` sur `8086`
+
+Verifier l'etat:
+```
+docker compose ps
+```
+
+Voir les logs du serveur web:
+```
+docker compose logs -f app
+```
+
 ## Lancement rapide
 ```
 node server.js
 ```
 
 Puis ouvrir http://localhost:3000
+
+Important:
+- Si tu utilises le mode Docker ci-dessus, ne lance pas `node server.js` en meme temps.
+- Le conteneur `app` est deja configure pour lire MQTT via `mqtt://mosquitto:1883`.
 
 ## MQTT (Mosquitto)
 Le serveur ecoute aussi les mesures publiees sur un broker MQTT.
@@ -40,6 +66,21 @@ MQTT_URL=mqtt://localhost:1883
 MQTT_TOPIC=e6/bassin/metrics
 MQTT_CLIENT_ID=projet-e6-server
 ```
+
+## Connexion ESP32 vers Docker Mosquitto
+1. Laisse Docker tourner (`docker compose up -d`).
+2. Recupere l'IP locale de ton PC (PowerShell):
+```
+ipconfig
+```
+3. Dans `firmware/esp32_mqtt.ino`, mets cette IP dans `MQTT_HOST`.
+4. Garde le topic `e6/bassin/metrics` (identique au serveur).
+5. Televerse le code sur l'ESP32.
+6. Verifie les donnees recues:
+```
+docker compose logs -f app
+```
+Tu dois voir `MQTT connected` puis les mises a jour dans le dashboard.
 
 ## Scripts utiles
 ```

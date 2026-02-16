@@ -1,6 +1,35 @@
-version: '4.59.0'
-
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: projet-e6-app
+    ports:
+      - '3000:3000'
+    environment:
+      DATA_BACKEND: postgres
+      DATA_STRICT: 1
+      PG_URL: postgres://postgres:postgres@postgres:5432/projet_e6
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: super-secret-token
+      INFLUX_ORG: projet-e6
+      INFLUX_BUCKET: aquaculture
+      MQTT_ENABLED: 1
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_TOPIC: e6/bassin/metrics
+      MQTT_CLIENT_ID: projet-e6-server-docker
+      PORT: 3000
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      mosquitto:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      influxdb:
+        condition: service_started
+    restart: unless-stopped
+
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: projet-e6-mosquitto
@@ -21,6 +50,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/postgres.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d projet_e6']
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   influxdb:
     image: influxdb:2.7
