@@ -16,8 +16,11 @@ services:
       INFLUX_BUCKET: aquaculture
       MQTT_ENABLED: 1
       MQTT_URL: mqtt://mosquitto:1883
-      MQTT_TOPIC: e6/bassin/metrics
+      MQTT_TOPIC: tp/esp32/telemetry
+      MQTT_COMMAND_TOPIC: tp/esp32/cmd
+      MQTT_STATE_TOPIC: tp/esp32/state
       MQTT_CLIENT_ID: projet-e6-server-docker
+      MQTT_DEVICE_TIMEOUT_MS: 30000
       PORT: 3000
     volumes:
       - ./storage:/app/storage

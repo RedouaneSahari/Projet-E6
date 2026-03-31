@@ -1,4 +1,5 @@
 const fs = require('fs');
+const fsPromises = require('fs/promises');
 const path = require('path');
 
 function readJson(filePath, fallback) {
@@ -17,13 +18,35 @@ function readJson(filePath, fallback) {
   }
 }
 
-function writeJson(filePath, data) {
-  const payload = JSON.stringify(data, null, 2);
-  fs.writeFileSync(filePath, `${payload}\n`, 'utf8');
-}
-
 function createJsonStore({ metricsPath, seedFn, historyLimit = 120 }) {
   const pathToFile = metricsPath;
+  let history = [];
+  let writeChain = Promise.resolve();
+  let flushTimer = null;
+  let dirty = false;
+
+  const queuePersist = () => {
+    if (flushTimer) {
+      return;
+    }
+
+    flushTimer = setTimeout(() => {
+      flushTimer = null;
+      if (!dirty) {
+        return;
+      }
+
+      dirty = false;
+      const snapshot = history.slice();
+      const payload = `${JSON.stringify(snapshot, null, 2)}\n`;
+      writeChain = writeChain
+        .catch(() => {})
+        .then(() => fsPromises.writeFile(pathToFile, payload, 'utf8'))
+        .catch(() => {
+          dirty = true;
+        });
+    }, 150);
+  };
 
   return {
     backend: 'json',
@@ -35,32 +58,37 @@ function createJsonStore({ metricsPath, seedFn, historyLimit = 120 }) {
       }
       if (!fs.existsSync(pathToFile)) {
         const seed = seedFn ? seedFn() : [];
-        writeJson(pathToFile, seed);
+        history = historyLimit > 0 ? seed.slice(-historyLimit) : seed.slice();
+        await fsPromises.writeFile(pathToFile, `${JSON.stringify(history, null, 2)}\n`, 'utf8');
+        return;
       }
+
+      const loaded = readJson(pathToFile, []);
+      history = Array.isArray(loaded) ? loaded.slice(-historyLimit || undefined) : [];
     },
     async getHistory(limit) {
-      const history = readJson(pathToFile, []);
       if (!limit || limit <= 0) {
-        return history;
+        return history.slice();
       }
       return history.slice(-limit);
     },
     async getLatestMetric() {
-      const history = readJson(pathToFile, []);
       return history.length ? history[history.length - 1] : null;
     },
     async addMetric(metric) {
-      const history = readJson(pathToFile, []);
       history.push(metric);
-      const trimmed = historyLimit > 0 ? history.slice(-historyLimit) : history;
-      writeJson(pathToFile, trimmed);
+      if (historyLimit > 0 && history.length > historyLimit) {
+        history = history.slice(-historyLimit);
+      }
+      dirty = true;
+      queuePersist();
     },
     async info() {
       return {
         backend: 'json',
         engine: 'Local JSON',
         ok: true,
-        message: `Storage file: ${pathToFile}`,
+        message: `Storage file: ${pathToFile} (cache memoire actif)`,
       };
     },
   };

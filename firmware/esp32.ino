@@ -3,79 +3,215 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-// === A REMPLACER ===
 const char* WIFI_SSID = "YOUR_SSID";
 const char* WIFI_PASS = "YOUR_PASSWORD";
-// IP du PC qui heberge le serveur Node (meme reseau que l'ESP32)
-const char* API_URL = "http://192.168.1.10:3000/api/v1/metrics";
+const char* API_BASE = "http://192.168.1.10:3000/api/v1";
+const char* DEVICE_ID = "esp32-http-01";
+const char* FIRMWARE_VERSION = "http-poll-v2";
 
-// === CAPTEURS ===
-const int ONE_WIRE_BUS = 4;  // DS18B20
-const int PH_PIN = 34;       // capteur pH (analog)
-const int TURB_PIN = 35;     // capteur turbidite (analog)
-const int LEVEL_PIN = 32;    // capteur niveau d'eau (analog)
+const int ONE_WIRE_BUS = 4;
+const int PH_PIN = 34;
+const int TURB_PIN = 35;
+const int LEVEL_PIN = 32;
+const int PUMP_RELAY_PIN = 26;
+const int HEATER_RELAY_PIN = 27;
+
+const bool RELAY_ACTIVE_LOW = true;
+const unsigned long WIFI_RETRY_MS = 5000;
+const unsigned long TELEMETRY_INTERVAL_MS = 10000;
+const unsigned long COMMAND_POLL_INTERVAL_MS = 2500;
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
+bool pumpOn = false;
+bool heaterOn = false;
+bool pumpManual = false;
+bool heaterManual = false;
+
+unsigned long lastWifiAttemptMs = 0;
+unsigned long lastTelemetryMs = 0;
+unsigned long lastCommandPollMs = 0;
+
+void writeRelay(int pin, bool enabled) {
+  digitalWrite(pin, RELAY_ACTIVE_LOW ? !enabled : enabled);
+}
+
+void applyOutputs() {
+  writeRelay(PUMP_RELAY_PIN, pumpOn);
+  writeRelay(HEATER_RELAY_PIN, heaterOn);
+}
+
+String extractJsonString(const String& json, const char* key) {
+  String pattern = String("\"") + key + "\":";
+  int keyIndex = json.indexOf(pattern);
+  if (keyIndex < 0) {
+    return "";
+  }
+
+  int valueStart = keyIndex + pattern.length();
+  while (valueStart < json.length() && (json[valueStart] == ' ' || json[valueStart] == '\n' || json[valueStart] == '\r')) {
+    valueStart++;
+  }
+
+  if (valueStart >= json.length()) {
+    return "";
+  }
+
+  if (json[valueStart] == '"') {
+    valueStart++;
+    int valueEnd = json.indexOf('"', valueStart);
+    if (valueEnd < 0) {
+      return "";
+    }
+    return json.substring(valueStart, valueEnd);
+  }
+
+  int valueEnd = json.indexOf(',', valueStart);
+  if (valueEnd < 0) {
+    valueEnd = json.indexOf('}', valueStart);
+  }
+  if (valueEnd < 0) {
+    return "";
+  }
+
+  String value = json.substring(valueStart, valueEnd);
+  value.trim();
+  return value;
+}
+
 float readPH() {
-  int raw = analogRead(PH_PIN);
-  return (raw / 4095.0) * 14.0; // a calibrer
+  return (analogRead(PH_PIN) / 4095.0f) * 14.0f;
 }
 
 float readTurbidity() {
-  int raw = analogRead(TURB_PIN);
-  return (raw / 4095.0) * 40.0; // a calibrer
+  return (analogRead(TURB_PIN) / 4095.0f) * 40.0f;
 }
 
 float readWaterLevel() {
-  int raw = analogRead(LEVEL_PIN);
-  return (raw / 4095.0) * 100.0; // 0-100%
+  return (analogRead(LEVEL_PIN) / 4095.0f) * 100.0f;
 }
 
 float readHumidity() {
-  // Si pas de capteur humidite, mettre une valeur fixe
-  return 50.0;
+  return 50.0f;
+}
+
+float readTemperature() {
+  sensors.requestTemperatures();
+  float value = sensors.getTempCByIndex(0);
+  if (value == DEVICE_DISCONNECTED_C) {
+    return 0.0f;
+  }
+  return value;
+}
+
+void ensureWifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
+
+  if (millis() - lastWifiAttemptMs < WIFI_RETRY_MS) {
+    return;
+  }
+
+  lastWifiAttemptMs = millis();
+  Serial.println("Connexion Wi-Fi...");
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+}
+
+void pollDesiredState() {
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  HTTPClient http;
+  String url = String(API_BASE) + "/device/desired-state";
+  http.begin(url);
+  int code = http.GET();
+  if (code == 200) {
+    String body = http.getString();
+    String nextPumpState = extractJsonString(body, "pumpState");
+    String nextPumpMode = extractJsonString(body, "pumpMode");
+    String nextHeaterState = extractJsonString(body, "heaterState");
+    String nextHeaterMode = extractJsonString(body, "heaterMode");
+
+    if (nextPumpState == "on" || nextPumpState == "off") {
+      pumpOn = nextPumpState == "on";
+    }
+    if (nextPumpMode == "manual" || nextPumpMode == "auto") {
+      pumpManual = nextPumpMode == "manual";
+    }
+    if (nextHeaterState == "on" || nextHeaterState == "off") {
+      heaterOn = nextHeaterState == "on";
+    }
+    if (nextHeaterMode == "manual" || nextHeaterMode == "auto") {
+      heaterManual = nextHeaterMode == "manual";
+    }
+
+    applyOutputs();
+  }
+  http.end();
+}
+
+void postTelemetry() {
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  HTTPClient http;
+  String url = String(API_BASE) + "/metrics";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+
+  String ip = WiFi.localIP().toString();
+  float tempC = readTemperature();
+  float ph = readPH();
+  float turbidity = readTurbidity();
+  float level = readWaterLevel();
+  float humidity = readHumidity();
+
+  String payload = String("{\"deviceId\":\"") + DEVICE_ID +
+    "\",\"firmware\":\"" + FIRMWARE_VERSION +
+    "\",\"ip\":\"" + ip +
+    "\",\"rssi\":" + WiFi.RSSI() +
+    ",\"freeHeap\":" + ESP.getFreeHeap() +
+    ",\"uptimeMs\":" + millis() +
+    ",\"temperature\":" + tempC +
+    ",\"ph\":" + ph +
+    ",\"turbidity\":" + turbidity +
+    ",\"water_level\":" + level +
+    ",\"humidity\":" + humidity +
+    ",\"pump\":{\"state\":\"" + String(pumpOn ? "on" : "off") + "\",\"mode\":\"" + String(pumpManual ? "manual" : "auto") + "\"}" +
+    ",\"heater\":{\"state\":\"" + String(heaterOn ? "on" : "off") + "\",\"mode\":\"" + String(heaterManual ? "manual" : "auto") + "\"}" +
+    "}";
+
+  int code = http.POST(payload);
+  Serial.printf("POST status: %d\n", code);
+  Serial.println(payload);
+  http.end();
 }
 
 void setup() {
   Serial.begin(115200);
   sensors.begin();
 
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi connected");
+  pinMode(PUMP_RELAY_PIN, OUTPUT);
+  pinMode(HEATER_RELAY_PIN, OUTPUT);
+  applyOutputs();
+
+  WiFi.mode(WIFI_STA);
 }
 
 void loop() {
-  sensors.requestTemperatures();
-  float tempC = sensors.getTempCByIndex(0);
-  float ph = readPH();
-  float turbidity = readTurbidity();
-  float level = readWaterLevel();
-  float humidity = readHumidity();
+  ensureWifi();
 
-  Serial.printf("Temp: %.2f C | pH: %.2f | Turb: %.2f | Level: %.2f%% | Hum: %.2f%%\n",
-                tempC, ph, turbidity, level, humidity);
-
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.begin(API_URL);
-    http.addHeader("Content-Type", "application/json");
-
-    String payload = String("{\"temperature\":") + tempC +
-      ",\"ph\":" + ph +
-      ",\"turbidity\":" + turbidity +
-      ",\"water_level\":" + level +
-      ",\"humidity\":" + humidity + "}";
-
-    int code = http.POST(payload);
-    Serial.printf("POST status: %d\n", code);
-    http.end();
+  if (WiFi.status() == WL_CONNECTED && millis() - lastCommandPollMs >= COMMAND_POLL_INTERVAL_MS) {
+    lastCommandPollMs = millis();
+    pollDesiredState();
   }
 
-  delay(10000);
+  if (WiFi.status() == WL_CONNECTED && millis() - lastTelemetryMs >= TELEMETRY_INTERVAL_MS) {
+    lastTelemetryMs = millis();
+    postTelemetry();
+  }
 }

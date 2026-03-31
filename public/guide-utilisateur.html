@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Guide utilisateur - Projet E6</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="doc-shell">
+    <article class="doc-article">
+      <section>
+        <p class="eyebrow">Projet E6</p>
+        <h1>Guide utilisateur du dashboard</h1>
+        <p>Ce guide explique comment surveiller le bassin, lire les indicateurs, consulter l'historique et envoyer une commande de marche ou d'arret a la pompe de recyclage.</p>
+        <a class="text-link" href="./index.html#dashboard">Retour au dashboard</a>
+      </section>
+
+      <section>
+        <h2>1. Lecture rapide de l'ecran</h2>
+        <ul>
+          <li>La ligne de supervision affiche l'etat de la station, de la pompe, le nombre d'alertes actives et le canal d'alerte.</li>
+          <li>Le bloc "Mesures temps reel" affiche temperature, pH, turbidite, niveau d'eau et humidite.</li>
+          <li>Le graphique donne la tendance recente des mesures pour verifier l'evolution du bassin.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>2. Commande de la pompe</h2>
+        <ol>
+          <li>Se connecter avec le compte administrateur.</li>
+          <li>Aller dans "Commandes actionneurs".</li>
+          <li>Utiliser le bouton de la pompe pour passer de marche a arret ou inversement.</li>
+          <li>Verifier le retour d'etat dans la meme zone et dans le journal des actionneurs.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>3. Alertes et notifications</h2>
+        <ul>
+          <li>Les alertes apparaissent automatiquement lorsqu'un seuil est depasse.</li>
+          <li>Les notifications navigateur sont propres au poste en cours et demandent une autorisation.</li>
+          <li>Les alertes email necessitent une configuration SMTP cote serveur.</li>
+          <li>Le panneau "Canaux d'alerte" permet d'activer ou limiter les notifications critiques.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>4. Historique et exploitation</h2>
+        <ul>
+          <li>Utiliser l'historique pour comparer les 12 dernieres remontees.</li>
+          <li>Exporter un CSV pour une analyse externe ou un compte rendu de maintenance.</li>
+          <li>Consulter le journal des actionneurs apres chaque intervention manuelle.</li>
+        </ul>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

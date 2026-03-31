@@ -1,0 +1,17 @@
+{
+  "enabled": false,
+  "manualHoldMinutes": 20,
+  "heater": {
+    "enabled": true,
+    "minTemp": 22,
+    "maxTemp": 26
+  },
+  "pump": {
+    "enabled": true,
+    "lowLevelCutoff": 58,
+    "turbidityStart": 24,
+    "turbidityStop": 18,
+    "cycleOnMinutes": 10,
+    "cycleOffMinutes": 20
+  }
+}

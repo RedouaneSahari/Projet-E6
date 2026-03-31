@@ -1,0 +1,7 @@
+{
+  "email": {
+    "enabled": false,
+    "to": "",
+    "criticalOnly": true
+  }
+}
