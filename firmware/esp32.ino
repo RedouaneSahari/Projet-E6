@@ -1,33 +1,32 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-const char* WIFI_SSID = "YOUR_SSID";
-const char* WIFI_PASS = "YOUR_PASSWORD";
-const char* API_BASE = "http://192.168.1.10:3000/api/v1";
+const char* WIFI_SSID = "Iphone_Younes";
+const char* WIFI_PASS = "younes92";
+const char* API_BASE = "https://loise-metalinguistic-amada.ngrok-free.dev/api/v1";
 const char* DEVICE_ID = "esp32-http-01";
-const char* FIRMWARE_VERSION = "http-poll-v2";
+const char* FIRMWARE_VERSION = "http-remote-pump-v2";
 
-const int ONE_WIRE_BUS = 4;
+const int ONE_WIRE_BUS = 26;
 const int PH_PIN = 34;
 const int TURB_PIN = 35;
-const int LEVEL_PIN = 32;
-const int PUMP_RELAY_PIN = 26;
-const int HEATER_RELAY_PIN = 27;
+const int PUMP_RELAY_PIN = 27;
 
-const bool RELAY_ACTIVE_LOW = true;
+const bool RELAY_ACTIVE_LOW = false;
 const unsigned long WIFI_RETRY_MS = 5000;
 const unsigned long TELEMETRY_INTERVAL_MS = 10000;
 const unsigned long COMMAND_POLL_INTERVAL_MS = 2500;
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
+WiFiClient wifiClient;
+WiFiClientSecure wifiSecureClient;
 
 bool pumpOn = false;
-bool heaterOn = false;
 bool pumpManual = false;
-bool heaterManual = false;
 
 unsigned long lastWifiAttemptMs = 0;
 unsigned long lastTelemetryMs = 0;
@@ -39,7 +38,15 @@ void writeRelay(int pin, bool enabled) {
 
 void applyOutputs() {
   writeRelay(PUMP_RELAY_PIN, pumpOn);
-  writeRelay(HEATER_RELAY_PIN, heaterOn);
+}
+
+bool beginApiRequest(HTTPClient& http, const String& url) {
+  if (url.startsWith("https://")) {
+    // Demo setup: trust the public TLS endpoint without pinning a CA certificate.
+    wifiSecureClient.setInsecure();
+    return http.begin(wifiSecureClient, url);
+  }
+  return http.begin(wifiClient, url);
 }
 
 String extractJsonString(const String& json, const char* key) {
@@ -88,14 +95,6 @@ float readTurbidity() {
   return (analogRead(TURB_PIN) / 4095.0f) * 40.0f;
 }
 
-float readWaterLevel() {
-  return (analogRead(LEVEL_PIN) / 4095.0f) * 100.0f;
-}
-
-float readHumidity() {
-  return 50.0f;
-}
-
 float readTemperature() {
   sensors.requestTemperatures();
   float value = sensors.getTempCByIndex(0);
@@ -126,26 +125,20 @@ void pollDesiredState() {
 
   HTTPClient http;
   String url = String(API_BASE) + "/device/desired-state";
-  http.begin(url);
+  if (!beginApiRequest(http, url)) {
+    return;
+  }
   int code = http.GET();
   if (code == 200) {
     String body = http.getString();
     String nextPumpState = extractJsonString(body, "pumpState");
     String nextPumpMode = extractJsonString(body, "pumpMode");
-    String nextHeaterState = extractJsonString(body, "heaterState");
-    String nextHeaterMode = extractJsonString(body, "heaterMode");
 
     if (nextPumpState == "on" || nextPumpState == "off") {
       pumpOn = nextPumpState == "on";
     }
     if (nextPumpMode == "manual" || nextPumpMode == "auto") {
       pumpManual = nextPumpMode == "manual";
-    }
-    if (nextHeaterState == "on" || nextHeaterState == "off") {
-      heaterOn = nextHeaterState == "on";
-    }
-    if (nextHeaterMode == "manual" || nextHeaterMode == "auto") {
-      heaterManual = nextHeaterMode == "manual";
     }
 
     applyOutputs();
@@ -160,15 +153,15 @@ void postTelemetry() {
 
   HTTPClient http;
   String url = String(API_BASE) + "/metrics";
-  http.begin(url);
+  if (!beginApiRequest(http, url)) {
+    return;
+  }
   http.addHeader("Content-Type", "application/json");
 
   String ip = WiFi.localIP().toString();
   float tempC = readTemperature();
   float ph = readPH();
   float turbidity = readTurbidity();
-  float level = readWaterLevel();
-  float humidity = readHumidity();
 
   String payload = String("{\"deviceId\":\"") + DEVICE_ID +
     "\",\"firmware\":\"" + FIRMWARE_VERSION +
@@ -179,10 +172,8 @@ void postTelemetry() {
     ",\"temperature\":" + tempC +
     ",\"ph\":" + ph +
     ",\"turbidity\":" + turbidity +
-    ",\"water_level\":" + level +
-    ",\"humidity\":" + humidity +
+    ",\"capabilities\":{\"pump\":true,\"heater\":false,\"waterLevel\":false,\"humidity\":false,\"pumpAutoCommand\":false}" +
     ",\"pump\":{\"state\":\"" + String(pumpOn ? "on" : "off") + "\",\"mode\":\"" + String(pumpManual ? "manual" : "auto") + "\"}" +
-    ",\"heater\":{\"state\":\"" + String(heaterOn ? "on" : "off") + "\",\"mode\":\"" + String(heaterManual ? "manual" : "auto") + "\"}" +
     "}";
 
   int code = http.POST(payload);
@@ -196,7 +187,6 @@ void setup() {
   sensors.begin();
 
   pinMode(PUMP_RELAY_PIN, OUTPUT);
-  pinMode(HEATER_RELAY_PIN, OUTPUT);
   applyOutputs();
 
   WiFi.mode(WIFI_STA);

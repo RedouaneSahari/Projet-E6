@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=20260331-pro" />
 </head>
 <body>
   <div class="backdrop" aria-hidden="true"></div>
@@ -17,22 +17,27 @@
       <div class="brand-mark">E6</div>
       <div>
         <div class="brand-title">Projet E6</div>
-        <div class="brand-subtitle">Bassin aquaculture connecte</div>
+        <div class="brand-subtitle">Control room pour bassin aquacole connecte</div>
       </div>
     </div>
-    <nav class="nav">
-      <a href="#presentation">Presentation</a>
-      <a href="#elements">Elements</a>
-      <a href="#dashboard">Dashboard</a>
-      <a href="#admin" data-admin-link class="admin-link">Admin</a>
-      <a href="#securite">Securite</a>
-      <a href="#docs">Docs</a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-menu-toggle>
+      <span></span>
+      <span></span>
+      <span></span>
+      <span class="menu-toggle-label">Menu</span>
+    </button>
+    <nav class="nav" id="site-nav" data-nav>
+      <a href="#dashboard">Supervision</a>
+      <a href="#capteurs">Capteurs</a>
+      <a href="#pompe">Pompe</a>
+      <a href="#alertes">Alertes</a>
+      <a href="#historique">Historique</a>
     </nav>
     <div class="topbar-actions">
       <div class="status-pill" data-api-status>API: en attente</div>
       <div class="auth-actions">
         <span class="auth-status" data-auth-status>Session: visiteur</span>
-        <button class="btn ghost small" type="button" data-auth-open>Connexion admin</button>
+        <button class="btn ghost small" type="button" data-auth-open>Connexion</button>
         <button class="btn ghost small" type="button" data-auth-logout>Deconnexion</button>
       </div>
     </div>
@@ -41,16 +46,16 @@
   <main>
     <section class="hero">
       <div class="hero-content">
-        <p class="eyebrow">RAS miniaturise + IoT</p>
-        <h1>Supervision intelligente d'un bassin aquacole connecte.</h1>
-        <p class="lead">Mesures temps reel, commandes locales, alertes et analyse historique pour un bassin pilote avec ESP32.</p>
+        <p class="eyebrow">Bassin pilote | ESP32 | supervision web</p>
+        <h1>Un site plus simple pour suivre les capteurs et piloter la pompe.</h1>
+        <p class="lead">L'interface affiche les releves des capteurs connectes en temps reel et ne conserve qu'une seule commande manuelle: la mise en marche ou l'arret de la pompe de recyclage.</p>
         <div class="hero-actions">
-          <button class="btn" type="button" data-scroll="dashboard">Voir le dashboard</button>
-          <button class="btn outline" type="button" data-scroll="elements">Voir les modules</button>
-          <button class="btn ghost" type="button" data-refresh>Rafraichir</button>
+          <button class="btn" type="button" data-scroll="dashboard">Ouvrir la supervision</button>
+          <button class="btn outline" type="button" data-scroll="capteurs">Voir les capteurs</button>
+          <button class="btn ghost" type="button" data-refresh>Actualiser les donnees</button>
         </div>
-        <div class="hero-stats">
-          <div class="stat-card">
+        <div class="hero-stats" aria-label="Synthese instantanee">
+          <div class="stat-card featured">
             <div class="stat-value" data-metric="temperature">--</div>
             <div class="stat-label">Temperature (C)</div>
           </div>
@@ -67,170 +72,57 @@
             <div class="stat-label">Niveau d'eau (%)</div>
           </div>
         </div>
+        <div class="hero-footnote">
+          <span>Lecture temps reel</span>
+          <span>Temperature, pH, turbidite, niveau</span>
+          <span>Commande simple de la pompe</span>
+          <span>Historique recent</span>
+        </div>
       </div>
       <div class="hero-visual" aria-hidden="true">
-        <div class="card globe">
-          <div class="glow"></div>
-          <div class="globe-core"></div>
-          <div class="globe-ring"></div>
-          <div class="globe-ring ring-2"></div>
-          <div class="globe-ring ring-3"></div>
-          <div class="globe-info">
-            <span>Connexion ESP32</span>
-            <strong data-connection>Online</strong>
+        <div class="hero-frame">
+          <div class="hero-gridline"></div>
+          <div class="hero-gridline second"></div>
+          <div class="hero-gridline third"></div>
+          <div class="hero-head">
+            <div class="hero-readouts">
+              <div class="hero-readout">
+                <span>Etat station</span>
+                <strong>ESP32 + API</strong>
+              </div>
+              <div class="hero-readout">
+                <span>Pompe</span>
+                <strong>Recyclage pilote</strong>
+              </div>
+              <div class="hero-readout">
+                <span>Alertes</span>
+                <strong>Lecture directe</strong>
+              </div>
+            </div>
+            <div class="hero-status-panel">
+              <div class="hero-panel-kicker">Liaison terrain</div>
+              <strong data-connection>En attente ESP32</strong>
+              <p>Retour ESP32 et donnees capteurs visibles en un coup d'oeil.</p>
+            </div>
           </div>
-        </div>
-        <div class="card floating-card">
-          <div class="card-title">Synthese capteurs</div>
-          <ul>
-            <li>DS18B20 temperature</li>
-            <li>pH analogique</li>
-            <li>Turbidite optique</li>
-            <li>Niveau d'eau</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <section id="presentation" class="section reveal">
-      <div class="section-header">
-        <h2>Presentation</h2>
-        <p>Le besoin exprime porte sur la mise en place d'un bassin d'aquaculture connecte, base sur un systeme RAS miniaturise.</p>
-      </div>
-      <div class="content-grid">
-        <div class="content-card">
-          <h3>Objectif principal</h3>
-          <p>Mesurer en continu temperature, niveau d'eau, turbidite et pH, piloter les actionneurs (pompe, chauffage) et envoyer les donnees vers une plateforme numerique.</p>
-        </div>
-        <div class="content-card">
-          <h3>Contexte pedagogique</h3>
-          <p>Ce projet rapproche l'etudiant des environnements supervises, de l'industrie 4.0, de la domotique et de la pisciculture intelligente.</p>
-        </div>
-        <div class="content-card">
-          <h3>Livrables attendus</h3>
-          <p>Tableau de bord web, API REST, historique des mesures, journalisation des commandes et documentation technique.</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="elements" class="section reveal">
-      <div class="section-header">
-        <h2>Elements</h2>
-        <p>Vision complete du systeme embarque, reseau, serveur et supervision.</p>
-      </div>
-      <div class="modules">
-        <article class="module-card">
-          <h3>A. ESP32 / Embarque</h3>
-          <ul>
-            <li>Programmation Arduino / ESP32.</li>
-            <li>Lecture capteurs: DS18B20, pH, niveau, turbidite.</li>
-            <li>Controle actionneurs via relais.</li>
-            <li>Logique automatique locale (seuils, declenchement).</li>
-            <li>Envoi des donnees via Wi-Fi.</li>
-          </ul>
-        </article>
-        <article class="module-card">
-          <h3>B. Reseau / IoT</h3>
-          <ul>
-            <li>Serveur MQTT ou API HTTP/REST.</li>
-            <li>Adressage IP fixe / DHCP.</li>
-            <li>Securisation Wi-Fi (WPA2, VLAN IoT).</li>
-            <li>Configuration pare-feu (ports MQTT/HTTP).</li>
-            <li>Tests de charge et stabilite.</li>
-          </ul>
-        </article>
-        <article class="module-card">
-          <h3>C. Serveur / Stockage</h3>
-          <ul>
-            <li>Base de donnees (MongoDB / MySQL / InfluxDB).</li>
-            <li>Enregistrement a frequence reguliere.</li>
-            <li>Sauvegarde automatique.</li>
-            <li>Analyse de tendances.</li>
-          </ul>
-        </article>
-        <article class="module-card">
-          <h3>D. Interface / Supervision</h3>
-          <ul>
-            <li>Interface web HTML/CSS/JS.</li>
-            <li>Affichage temps reel et historique.</li>
-            <li>Commandes pompe et chauffage.</li>
-            <li>Alertes mail et notification web.</li>
-          </ul>
-        </article>
-        <article class="module-card">
-          <h3>E. Securite</h3>
-          <ul>
-            <li>Authentification pour l'acces.</li>
-            <li>Securisation MQTT (password + ACL).</li>
-            <li>Cloisonnement reseau.</li>
-            <li>Journalisation des declenchements.</li>
-            <li>Tests d'intrusion simples.</li>
-          </ul>
-        </article>
-      </div>
-    </section>
-
-    <section id="use-cases" class="section reveal">
-      <div class="section-header">
-        <h2>Cas d'utilisation</h2>
-        <p>Le technicien aquacole pilote le bassin a travers un seul point de controle.</p>
-      </div>
-      <div class="use-cases">
-        <div class="use-main">
-          <div class="use-avatar"></div>
-          <div>
-            <h3>Technicien aquacole</h3>
-            <p>Authentification requise pour acceder aux mesures, commandes et alertes.</p>
+          <div class="hero-tank">
+            <div class="tank-rim"></div>
+            <div class="tank-water"></div>
+            <div class="tank-bed"></div>
+            <div class="tank-module top"></div>
+            <div class="tank-module side left"></div>
+            <div class="tank-module side right"></div>
+            <div class="tank-pipe left"></div>
+            <div class="tank-pipe right"></div>
           </div>
-        </div>
-        <div class="use-list">
-          <div class="use-item">Surveiller les parametres du bassin</div>
-          <div class="use-item">Consulter l'historique des mesures</div>
-          <div class="use-item">Modifier consignes et seuils d'alarme</div>
-          <div class="use-item">Commander manuellement la pompe</div>
-          <div class="use-item">Commander manuellement le chauffage</div>
-          <div class="use-item">Consulter les alertes et journaux</div>
-        </div>
-      </div>
-    </section>
-
-    <section id="resources" class="section reveal">
-      <div class="section-header">
-        <h2>Ressources</h2>
-        <p>Materiel principal pour le prototype RAS connecte.</p>
-      </div>
-      <div class="resources-grid">
-        <div class="resource-card">
-          <h4>Carte ESP32</h4>
-          <p>Microcontroleur Wi-Fi pour capteurs et actionneurs.</p>
-        </div>
-        <div class="resource-card">
-          <h4>Capteurs</h4>
-          <p>DS18B20, pH, turbidite, niveau d'eau.</p>
-        </div>
-        <div class="resource-card">
-          <h4>Actionneurs</h4>
-          <p>Pompe, chauffage, relais double.</p>
-        </div>
-        <div class="resource-card">
-          <h4>Reseau</h4>
-          <p>Wi-Fi / Ethernet, passerelle IoT.</p>
-        </div>
-        <div class="resource-card">
-          <h4>Serveur</h4>
-          <p>Infrastructure locale ou cloud pour API et stockage.</p>
-        </div>
-        <div class="resource-card">
-          <h4>Bassin 80L</h4>
-          <p>Tuyaux 12/16mm, filtres, accessoires.</p>
         </div>
       </div>
     </section>
 
     <section id="dashboard" class="section reveal">
       <div class="section-header">
-        <h2>Dashboard</h2>
-        <p>Supervision temps reel, commandes et alertes centralisees.</p>
+        <h2>Supervision du bassin</h2>
+        <p>Lecture en direct des capteurs connectes et commande manuelle de la pompe, sans mode automatique visible.</p>
       </div>
       <div class="ops-strip">
         <article class="ops-tile">
@@ -241,28 +133,28 @@
         <article class="ops-tile">
           <span class="ops-label">Pompe recyclage</span>
           <strong class="ops-value" data-ops-pump>--</strong>
-          <span class="ops-note">Commande terrain et retour du relais</span>
+          <span class="ops-note">Etat courant de la pompe</span>
+        </article>
+        <article class="ops-tile">
+          <span class="ops-label">Capteurs actifs</span>
+          <strong class="ops-value" data-ops-sensors>--</strong>
+          <span class="ops-note">Capteurs qui remontent actuellement une valeur</span>
+        </article>
+        <article class="ops-tile">
+          <span class="ops-label">Dernier releve</span>
+          <strong class="ops-value" data-ops-last-update>--</strong>
+          <span class="ops-note">Horodatage de la derniere mesure recue</span>
         </article>
         <article class="ops-tile">
           <span class="ops-label">Alertes actives</span>
           <strong class="ops-value" data-ops-alerts>0</strong>
           <span class="ops-note">Seuils depasses sur les dernieres remontees</span>
         </article>
-        <article class="ops-tile">
-          <span class="ops-label">Canal d'alerte</span>
-          <strong class="ops-value" data-ops-mail>Notification web</strong>
-          <span class="ops-note">Email configurable + navigateur</span>
-        </article>
-        <article class="ops-tile">
-          <span class="ops-label">Automatisation</span>
-          <strong class="ops-value" data-ops-automation>--</strong>
-          <span class="ops-note">Regles de chauffe, recyclage et securite niveau</span>
-        </article>
       </div>
-      <div class="dashboard-grid">
-        <div class="panel metrics">
+      <div class="dashboard-grid dashboard-grid-simple">
+        <div class="panel metrics" id="capteurs">
           <div class="panel-header">
-            <h3>Mesures temps reel</h3>
+            <h3>Capteurs connectes</h3>
             <span class="panel-sub" data-last-update>Derniere mise a jour: --</span>
           </div>
           <div class="metric-grid">
@@ -295,32 +187,23 @@
           <canvas id="trendChart" width="600" height="240" aria-label="Graphique tendance" role="img"></canvas>
           <div class="panel-footer">
             <button class="btn ghost small" type="button" data-export>Exporter CSV</button>
+            <span class="hint">Courbe de tendance sur les derniers releves disponibles.</span>
           </div>
         </div>
 
-        <div class="panel controls admin-target" id="controls">
+        <div class="panel controls admin-target" id="pompe">
           <div class="panel-header">
-            <h3>Commandes actionneurs</h3>
-            <span class="panel-sub">Marche / arret et retour d'etat</span>
+            <h3>Pilotage de la pompe</h3>
+            <span class="panel-sub">Une seule action manuelle disponible</span>
           </div>
-          <div class="control-group" data-control="pump">
-            <div>
-              <h4>Pompe de recyclage</h4>
-              <p>Etat: <strong data-actuator-state="pump">--</strong></p>
+          <div class="simple-pump-card" data-control="pump">
+            <div class="pump-state-block">
+              <span class="ops-label">Etat actuel</span>
+              <strong class="pump-state-value" data-actuator-state="pump">--</strong>
+              <p>Utiliser ce bouton pour demarrer ou arreter la pompe de recyclage.</p>
             </div>
-            <div class="control-actions">
-              <button class="btn small" data-toggle="pump">Basculer</button>
-              <button class="btn ghost small" data-mode="pump">Mode auto</button>
-            </div>
-          </div>
-          <div class="control-group" data-control="heater">
-            <div>
-              <h4>Chauffage</h4>
-              <p>Etat: <strong data-actuator-state="heater">--</strong></p>
-            </div>
-            <div class="control-actions">
-              <button class="btn small" data-toggle="heater">Basculer</button>
-              <button class="btn ghost small" data-mode="heater">Mode auto</button>
+            <div class="control-actions stacked">
+              <button class="btn pump-toggle-btn" data-toggle="pump">Basculer la pompe</button>
             </div>
           </div>
           <div class="panel-footer">
@@ -328,201 +211,26 @@
           </div>
         </div>
 
-        <div class="panel automation admin-target" id="automation">
+        <div class="panel alerts" id="alertes">
           <div class="panel-header">
-            <h3>Automatisation bassin</h3>
-            <span class="panel-sub">Supervision serveur avec maintien manuel temporaire</span>
-          </div>
-          <p class="automation-summary" data-automation-summary>Automatisation inactive.</p>
-          <form class="automation-form" data-automation-form>
-            <div class="notify-columns">
-              <div class="notify-block">
-                <h4>Mode global</h4>
-                <label class="toggle-line">
-                  <input type="checkbox" name="automation_enabled" />
-                  Activer l'automatisation supervisee
-                </label>
-                <label>
-                  Maintien manuel (minutes)
-                  <input type="number" min="1" max="180" step="1" name="manual_hold_minutes" />
-                </label>
-                <p class="form-hint">Apres une commande admin, le serveur laisse la main pendant ce delai avant de reprendre la regulation.</p>
-              </div>
-
-              <div class="notify-block">
-                <h4>Chauffage</h4>
-                <label class="toggle-line">
-                  <input type="checkbox" name="heater_enabled" />
-                  Regulation automatique du chauffage
-                </label>
-                <label>
-                  Temperature mini (C)
-                  <input type="number" step="0.1" name="heater_min_temp" />
-                </label>
-                <label>
-                  Temperature maxi (C)
-                  <input type="number" step="0.1" name="heater_max_temp" />
-                </label>
-              </div>
-
-              <div class="notify-block">
-                <h4>Pompe de recyclage</h4>
-                <label class="toggle-line">
-                  <input type="checkbox" name="pump_enabled" />
-                  Regulation automatique de la pompe
-                </label>
-                <label>
-                  Niveau mini securite (%)
-                  <input type="number" min="0" max="100" step="0.1" name="pump_low_level_cutoff" />
-                </label>
-                <label>
-                  Turbidite demarrage (NTU)
-                  <input type="number" min="0" step="0.1" name="pump_turbidity_start" />
-                </label>
-                <label>
-                  Turbidite retour cycle (NTU)
-                  <input type="number" min="0" step="0.1" name="pump_turbidity_stop" />
-                </label>
-                <div class="field-row">
-                  <label>
-                    Marche cycle (min)
-                    <input type="number" min="1" max="240" step="1" name="pump_cycle_on_minutes" />
-                  </label>
-                  <label>
-                    Pause cycle (min)
-                    <input type="number" min="1" max="240" step="1" name="pump_cycle_off_minutes" />
-                  </label>
-                </div>
-              </div>
-            </div>
-            <div class="panel-footer">
-              <button class="btn" type="submit">Sauvegarder l'automatisation</button>
-              <span class="hint" data-automation-status>Connexion admin requise pour modifier.</span>
-            </div>
-          </form>
-        </div>
-
-        <div class="panel thresholds admin-target" id="thresholds">
-          <div class="panel-header">
-            <h3>Seuils & consignes</h3>
-            <span class="panel-sub">Parametrage securise</span>
-          </div>
-          <form class="threshold-form" data-threshold-form>
-            <div class="field">
-              <label>Temperature (C)</label>
-              <div class="field-row">
-                <input type="number" step="0.1" name="temperature_min" placeholder="Min" />
-                <input type="number" step="0.1" name="temperature_max" placeholder="Max" />
-              </div>
-            </div>
-            <div class="field">
-              <label>pH</label>
-              <div class="field-row">
-                <input type="number" step="0.01" name="ph_min" placeholder="Min" />
-                <input type="number" step="0.01" name="ph_max" placeholder="Max" />
-              </div>
-            </div>
-            <div class="field">
-              <label>Turbidite (NTU)</label>
-              <div class="field-row">
-                <input type="number" step="0.1" name="turbidity_max" placeholder="Max" />
-              </div>
-            </div>
-            <div class="field">
-              <label>Niveau d'eau (%)</label>
-              <div class="field-row">
-                <input type="number" step="0.1" name="water_level_min" placeholder="Min" />
-                <input type="number" step="0.1" name="water_level_max" placeholder="Max" />
-              </div>
-            </div>
-            <div class="field">
-              <label>Humidite (%)</label>
-              <div class="field-row">
-                <input type="number" step="0.1" name="humidity_min" placeholder="Min" />
-                <input type="number" step="0.1" name="humidity_max" placeholder="Max" />
-              </div>
-            </div>
-            <button class="btn" type="submit">Sauvegarder</button>
-            <p class="form-hint" data-threshold-status>Connexion admin requise pour modifier.</p>
-          </form>
-        </div>
-
-        <div class="panel alerts">
-          <div class="panel-header">
-            <h3>Alertes & notifications</h3>
-            <span class="panel-sub">Web + email</span>
+            <h3>Alertes capteurs</h3>
+            <span class="panel-sub">Surveillance des depassements de seuils</span>
           </div>
           <p class="alert-summary" data-alert-summary>Aucune alerte active.</p>
           <div class="alert-list" data-alert-list></div>
         </div>
 
-        <div class="panel notifications admin-target" id="notifications">
+        <div class="panel history" id="historique">
           <div class="panel-header">
-            <h3>Canaux d'alerte</h3>
-            <span class="panel-sub">Notifications navigateur et email</span>
-          </div>
-          <div class="notify-columns">
-            <div class="notify-block">
-              <h4>Notifications navigateur</h4>
-              <p class="form-hint">Activees sur ce poste uniquement. Demande une autorisation du navigateur.</p>
-              <label class="toggle-line">
-                <input type="checkbox" data-browser-enabled />
-                Activer les notifications web
-              </label>
-              <label class="toggle-line">
-                <input type="checkbox" data-browser-critical-only />
-                Afficher seulement les alertes critiques
-              </label>
-              <div class="control-actions">
-                <button class="btn ghost small" type="button" data-browser-permission>Autoriser le navigateur</button>
-              </div>
-              <p class="form-hint" data-browser-status>Permission: --</p>
-            </div>
-
-            <form class="notify-block email-form" data-email-form>
-              <h4>Alertes email</h4>
-              <p class="form-hint">Configuration serveur requise via SMTP pour envoyer les emails.</p>
-              <label class="toggle-line">
-                <input type="checkbox" name="email_enabled" />
-                Activer les alertes email
-              </label>
-              <label>
-                Adresse destinataire
-                <input type="email" name="email_to" placeholder="technicien@exemple.fr" />
-              </label>
-              <label class="toggle-line">
-                <input type="checkbox" name="email_critical_only" />
-                Envoyer seulement les alertes critiques
-              </label>
-              <div class="control-actions">
-                <button class="btn small" type="submit">Enregistrer</button>
-                <button class="btn ghost small" type="button" data-email-test>Tester l'email</button>
-              </div>
-              <p class="form-hint" data-email-status>Connexion admin requise.</p>
-            </form>
-          </div>
-        </div>
-
-        <div class="panel history">
-          <div class="panel-header">
-            <h3>Historique recent</h3>
+            <h3>Historique des releves</h3>
             <span class="panel-sub">12 derniers echantillons</span>
           </div>
           <div class="history-table" data-history-table></div>
         </div>
-
-        <div class="panel logs">
+        <div class="panel system" id="etat-liaison">
           <div class="panel-header">
-            <h3>Journal actionneurs</h3>
-            <span class="panel-sub">Trafic et operations</span>
-          </div>
-          <div class="log-list" data-log-list></div>
-        </div>
-
-        <div class="panel system">
-          <div class="panel-header">
-            <h3>Sources de donnees</h3>
-            <span class="panel-sub">Backend actif</span>
+            <h3>Etat de la liaison</h3>
+            <span class="panel-sub">Connexion serveur et ESP32</span>
           </div>
           <div class="system-grid">
             <div>
@@ -538,10 +246,6 @@
               <div class="system-pill" data-system-status>--</div>
             </div>
             <div>
-              <div class="system-label">Details</div>
-              <div class="system-note" data-system-message>--</div>
-            </div>
-            <div>
               <div class="system-label">ESP32</div>
               <div class="system-pill" data-device-status>--</div>
             </div>
@@ -550,132 +254,12 @@
               <div class="system-note" data-device-lastseen>--</div>
             </div>
             <div>
-              <div class="system-label">IP locale</div>
-              <div class="system-note" data-device-ip>--</div>
-            </div>
-            <div>
               <div class="system-label">RSSI Wi-Fi</div>
               <div class="system-note" data-device-rssi>--</div>
             </div>
           </div>
           <div class="panel-footer">
-            <span class="hint">Backend configurable + commandes ESP32 via MQTT.</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="admin" class="section reveal admin-section" data-admin-section>
-      <div class="section-header">
-        <h2>Admin</h2>
-        <p>Zone reservee a l'administration du bassin (seuils et actionneurs).</p>
-      </div>
-      <div class="admin-grid">
-        <div class="panel">
-          <div class="panel-header">
-            <h3>Actions rapides</h3>
-            <span class="panel-sub">Acces admin requis</span>
-          </div>
-          <div class="admin-actions">
-            <button class="btn" type="button" data-admin-scroll="thresholds">Modifier les seuils</button>
-            <button class="btn outline" type="button" data-admin-scroll="controls">Piloter les actionneurs</button>
-          </div>
-          <p class="form-hint">Active seulement si la session admin est ouverte.</p>
-        </div>
-        <div class="panel">
-          <div class="panel-header">
-            <h3>Etat session</h3>
-            <span class="panel-sub">Role courant</span>
-          </div>
-          <div class="system-grid">
-            <div>
-              <div class="system-label">Role</div>
-              <div class="system-value" data-admin-role>Visiteur</div>
-            </div>
-            <div>
-              <div class="system-label">Acces</div>
-              <div class="system-pill" data-admin-access>Lecture seule</div>
-            </div>
-            <div>
-              <div class="system-label">Compte</div>
-              <div class="system-note" data-admin-user>Non connecte</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="securite" class="section reveal">
-      <div class="section-header">
-        <h2>Securite</h2>
-        <p>Protection de l'interface, du reseau IoT et des donnees.</p>
-      </div>
-      <div class="content-grid">
-        <div class="content-card">
-          <h3>Authentification</h3>
-          <p>Acces par identifiants, sessions et roles definis.</p>
-        </div>
-        <div class="content-card">
-          <h3>Segmentation reseau</h3>
-          <p>VLAN IoT, regles firewall et isolation des flux critiques.</p>
-        </div>
-        <div class="content-card">
-          <h3>Tracabilite</h3>
-          <p>Journalisation des actions et detection des anomalies.</p>
-        </div>
-      </div>
-    </section>
-
-    <section id="docs" class="section reveal">
-      <div class="section-header">
-        <h2>Documentation</h2>
-        <p>Guides d'installation, API et notices utilisateur.</p>
-      </div>
-      <div class="docs-grid">
-        <div class="doc-card">
-          <h3>Guide installation</h3>
-          <p>Serveur Node, configuration locale et lancement.</p>
-          <code>node server.js</code>
-        </div>
-        <div class="doc-card">
-          <h3>API REST</h3>
-          <p>Endpoints /api/v1 pour mesures, seuils, actionneurs et alertes.</p>
-        </div>
-        <div class="doc-card">
-          <h3>Maintenance</h3>
-          <p>Sauvegarde des donnees JSON, export CSV, logs des actions.</p>
-        </div>
-        <div class="doc-card">
-          <h3>Guide utilisateur</h3>
-          <p>Prise en main du dashboard, consultation des courbes et gestion des alertes.</p>
-          <a class="text-link" href="./guide-utilisateur.html">Ouvrir le guide</a>
-        </div>
-        <div class="doc-card">
-          <h3>Notice exploitation</h3>
-          <p>Procedure de demarrage, verification quotidienne et conduite en cas d'alarme.</p>
-          <a class="text-link" href="./notice-exploitation.html">Ouvrir la notice</a>
-        </div>
-      </div>
-      <div class="docs-checklist">
-        <div class="doc-step">
-          <span>1</span>
-          <div>
-            <strong>Observer</strong>
-            <p>Verifier la zone temps reel, l'etat ESP32 et le compteur d'alertes avant toute action.</p>
-          </div>
-        </div>
-        <div class="doc-step">
-          <span>2</span>
-          <div>
-            <strong>Agir</strong>
-            <p>Utiliser le bouton de marche / arret de la pompe de recyclage uniquement si la situation terrain le justifie.</p>
-          </div>
-        </div>
-        <div class="doc-step">
-          <span>3</span>
-          <div>
-            <strong>Tracer</strong>
-            <p>Consulter l'historique, les journaux et les alertes email/web pour conserver une trace d'exploitation.</p>
+            <span class="hint" data-system-message>--</span>
           </div>
         </div>
       </div>
@@ -685,10 +269,11 @@
   <footer class="footer">
     <div>
       <strong>Projet E6 - Bassin connecte</strong>
-      <p>Dashboard demo | Build 2026-02-02</p>
+      <p>Supervision simplifiee | Build 2026-04-10</p>
     </div>
     <div class="footer-links">
-      <span>HTML / CSS / JS</span>
+      <span>Capteurs connectes</span>
+      <span>Pompe de recyclage</span>
       <span>ESP32 + IoT</span>
     </div>
   </footer>
@@ -709,7 +294,7 @@
           <input type="password" name="password" autocomplete="current-password" required />
         </label>
         <button class="btn" type="submit">Se connecter</button>
-        <p class="auth-hint">Acces admin requis pour modifier les seuils et actionneurs.</p>
+        <p class="auth-hint">Acces admin requis pour commander la pompe.</p>
         <p class="auth-error" data-auth-error></p>
       </form>
     </div>

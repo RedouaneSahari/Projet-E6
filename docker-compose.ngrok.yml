@@ -1,0 +1,52 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: projet-e6-app-ngrok
+    command: ["npm", "run", "start:sqlite"]
+    ports:
+      - "3003:3000"
+    environment:
+      DATA_BACKEND: sqlite
+      DATA_STRICT: 0
+      SQLITE_PATH: /app/storage/metrics.ngrok.sqlite
+      ALERT_EMAIL_MODE: ${ALERT_EMAIL_MODE:-formsubmit}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-}
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURE: ${SMTP_SECURE:-0}
+      FORMSUBMIT_BASE_URL: ${FORMSUBMIT_BASE_URL:-https://formsubmit.co}
+      FORMSUBMIT_TEMPLATE: ${FORMSUBMIT_TEMPLATE:-table}
+      FORMSUBMIT_DISABLE_CAPTCHA: ${FORMSUBMIT_DISABLE_CAPTCHA:-1}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3003}
+      PORT: 3000
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASS: ${ADMIN_PASS}
+      TECH_USER: ${TECH_USER:-technicien}
+      TECH_PASS: ${TECH_PASS}
+    volumes:
+      - ./storage:/app/storage
+    restart: unless-stopped
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: projet-e6-ngrok
+    profiles:
+      - publish
+    command:
+      - "http"
+      - "http://app:3000"
+      - "--log"
+      - "stdout"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    depends_on:
+      - app
+    ports:
+      - "4041:4040"
+    restart: unless-stopped

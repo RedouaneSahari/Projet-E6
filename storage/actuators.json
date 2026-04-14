@@ -1,12 +1,16 @@
 {
   "pump": {
-    "state": "on",
-    "mode": "manual",
-    "lastChanged": "2026-02-16T10:02:53.905Z"
+    "state": "off",
+    "mode": "auto",
+    "lastChanged": "2026-04-10T10:45:00.000Z",
+    "manualUntil": null,
+    "automationNote": null
   },
   "heater": {
-    "state": "on",
-    "mode": "manual",
-    "lastChanged": "2026-02-16T10:02:55.586Z"
+    "state": "off",
+    "mode": "auto",
+    "lastChanged": "2026-04-10T10:45:00.000Z",
+    "manualUntil": null,
+    "automationNote": null
   }
 }

@@ -1,3 +1,11 @@
+function toNullableNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function createInfluxStore({ historyLimit = 120 }) {
   let influx;
   let client;
@@ -22,11 +30,11 @@ function createInfluxStore({ historyLimit = 120 }) {
 
   const normalizeRow = (row) => ({
     timestamp: row._time,
-    temperature: Number(row.temperature),
-    ph: Number(row.ph),
-    turbidity: Number(row.turbidity),
-    water_level: Number(row.water_level),
-    humidity: Number(row.humidity),
+    temperature: toNullableNumber(row.temperature),
+    ph: toNullableNumber(row.ph),
+    turbidity: toNullableNumber(row.turbidity),
+    water_level: toNullableNumber(row.water_level),
+    humidity: toNullableNumber(row.humidity),
   });
 
   return {
@@ -66,9 +74,13 @@ function createInfluxStore({ historyLimit = 120 }) {
         .floatField('temperature', metric.temperature)
         .floatField('ph', metric.ph)
         .floatField('turbidity', metric.turbidity)
-        .floatField('water_level', metric.water_level)
-        .floatField('humidity', metric.humidity)
         .timestamp(new Date(metric.timestamp));
+      if (Number.isFinite(metric.water_level)) {
+        point.floatField('water_level', metric.water_level);
+      }
+      if (Number.isFinite(metric.humidity)) {
+        point.floatField('humidity', metric.humidity);
+      }
       writeApi.writePoint(point);
       await writeApi.flush();
     },

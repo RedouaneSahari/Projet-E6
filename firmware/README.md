@@ -1,26 +1,37 @@
 # Firmware files
 
-- `esp32_mqtt.ino`: main firmware for this project (`ESP32 <-> MQTT Mosquitto <-> site`). It sends telemetry, receives commands, and publishes its connection state.
-- `esp32.ino`: HTTP fallback firmware. It posts telemetry to the API and polls `/api/v1/device/desired-state` to apply commands from the site.
-- `esp32_mqtt.txt`: legacy text copy of MQTT code. Keep only as reference, do not edit.
+Le projet utilise maintenant un seul firmware cote ESP32 :
 
-Recommended mode:
-- Docker + Mosquitto: use `esp32_mqtt.ino`
-- API only, no MQTT broker: use `esp32.ino`
+## `esp32.ino`
 
-Topics used by `esp32_mqtt.ino`:
-- telemetry: `tp/esp32/telemetry`
-- commands: `tp/esp32/cmd`
+Architecture :
 
-Pins to review before flashing:
-- `RELAY_PUMP`
-- `RELAY_HEATER`
+```text
+ESP32 -> API HTTP Node.js -> dashboard
+```
+
+Usage :
+- l'ESP32 envoie sa telemetrie a l'API HTTP
+- l'ESP32 recupere les consignes via polling HTTP
+- ce sketch est aligne sur une configuration **pompe uniquement**
+
+Configuration a verifier avant flash :
+- `WIFI_SSID`
+- `WIFI_PASS`
+- `API_BASE`
+- `DEVICE_ID`
+- `FIRMWARE_VERSION`
+
+Routes utilisees :
+- `POST /api/v1/metrics`
+- `GET /api/v1/device/desired-state`
+
+Broches actuellement utilisees :
 - `ONE_WIRE_BUS`
 - `PH_PIN`
-- `TURBIDITY_PIN`
-- `WATER_LEVEL_PIN`
+- `TURB_PIN`
+- `PUMP_RELAY_PIN`
 
-Notes:
-- the MQTT firmware now matches the exact connection code provided by the user
-- command format is plain text: `PUMP_ON`, `PUMP_OFF`, `HEATER_ON`, `HEATER_OFF`
-- telemetry sends raw ADC values for pH, turbidity and water level; the Node server converts them for the dashboard
+Point important :
+- le dashboard ne parle pas directement a l'ESP32
+- le chemin reel est : `site web -> serveur Node.js -> API HTTP -> ESP32`

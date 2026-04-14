@@ -14,32 +14,21 @@ services:
       INFLUX_TOKEN: super-secret-token
       INFLUX_ORG: projet-e6
       INFLUX_BUCKET: aquaculture
-      MQTT_ENABLED: 1
-      MQTT_URL: mqtt://mosquitto:1883
-      MQTT_TOPIC: tp/esp32/telemetry
-      MQTT_COMMAND_TOPIC: tp/esp32/cmd
-      MQTT_STATE_TOPIC: tp/esp32/state
-      MQTT_CLIENT_ID: projet-e6-server-docker
-      MQTT_DEVICE_TIMEOUT_MS: 30000
+      DEVICE_TIMEOUT_MS: 30000
+      ALERT_EMAIL_MODE: formsubmit
+      FORMSUBMIT_BASE_URL: https://formsubmit.co
+      FORMSUBMIT_TEMPLATE: table
+      FORMSUBMIT_DISABLE_CAPTCHA: 1
+      PUBLIC_BASE_URL: http://localhost:3000
       PORT: 3000
     volumes:
       - ./storage:/app/storage
     depends_on:
-      mosquitto:
-        condition: service_started
       postgres:
         condition: service_healthy
       influxdb:
         condition: service_started
     restart: unless-stopped
-
-  mosquitto:
-    image: eclipse-mosquitto:2
-    container_name: projet-e6-mosquitto
-    ports:
-      - '1883:1883'
-    volumes:
-      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
 
   postgres:
     image: postgres:16

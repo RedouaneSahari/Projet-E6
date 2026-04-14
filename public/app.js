@@ -1,5 +1,10 @@
 const apiBase = document.documentElement.dataset.apiBase || '/api/v1';
 const BROWSER_NOTIFICATION_PREFS_KEY = 'projet-e6-browser-notifications';
+const SENSOR_KEYS = ['temperature', 'ph', 'turbidity', 'water_level', 'humidity'];
+const DEVICE_LABELS = {
+  pump: 'pompe',
+  heater: 'chauffage',
+};
 
 const state = {
   history: [],
@@ -13,6 +18,7 @@ const state = {
   device: null,
   auth: { role: 'visitor' },
   sseConnected: false,
+  mobileTopbarCompact: false,
 };
 
 const dom = {
@@ -38,6 +44,8 @@ const dom = {
   deviceRssi: document.querySelector('[data-device-rssi]'),
   opsDevice: document.querySelector('[data-ops-device]'),
   opsPump: document.querySelector('[data-ops-pump]'),
+  opsSensors: document.querySelector('[data-ops-sensors]'),
+  opsLastUpdate: document.querySelector('[data-ops-last-update]'),
   opsAlerts: document.querySelector('[data-ops-alerts]'),
   opsMail: document.querySelector('[data-ops-mail]'),
   opsAutomation: document.querySelector('[data-ops-automation]'),
@@ -65,6 +73,9 @@ const dom = {
   adminRole: document.querySelector('[data-admin-role]'),
   adminAccess: document.querySelector('[data-admin-access]'),
   adminUser: document.querySelector('[data-admin-user]'),
+  topbar: document.querySelector('.topbar'),
+  menuToggle: document.querySelector('[data-menu-toggle]'),
+  nav: document.querySelector('[data-nav]'),
 };
 
 const actuatorNodes = {
@@ -84,6 +95,8 @@ let eventSource = null;
 const pendingActuators = new Set();
 const seenAlertIds = new Set();
 const browserNotificationPrefs = loadBrowserNotificationPrefs();
+let scrollFramePending = false;
+let scrollIdleTimer = null;
 
 function loadBrowserNotificationPrefs() {
   try {
@@ -116,6 +129,21 @@ function toFixedValue(value, decimals = 1) {
   return Number(value).toFixed(decimals);
 }
 
+function getLatestMetric() {
+  return state.history[state.history.length - 1] || null;
+}
+
+function getAvailableSensorCount(metric = getLatestMetric()) {
+  if (!metric) {
+    return 0;
+  }
+  return SENSOR_KEYS.filter((key) => Number.isFinite(Number(metric[key]))).length;
+}
+
+function getDeviceLabel(device) {
+  return DEVICE_LABELS[device] || device;
+}
+
 function formatDate(value) {
   if (!value) {
     return '--';
@@ -135,9 +163,44 @@ function isAuthenticated() {
   return Boolean(state.auth && state.auth.role && state.auth.role !== 'visitor');
 }
 
+function getDeviceTimeoutMs() {
+  return Number(state.system?.deviceTimeoutMs) || 30000;
+}
+
+function isDeviceOnline(device = state.device) {
+  if (!device?.lastSeen) {
+    return false;
+  }
+  const lastSeenMs = Date.parse(device.lastSeen);
+  if (!Number.isFinite(lastSeenMs)) {
+    return false;
+  }
+  return (Date.now() - lastSeenMs) <= getDeviceTimeoutMs();
+}
+
 function deviceCanReceiveCommands() {
-  const mqttEnabled = Boolean(state.system?.mqtt?.enabled);
-  return !mqttEnabled || Boolean(state.device?.online);
+  return true;
+}
+
+function isActuatorSupported(device) {
+  const capabilities = state.device?.capabilities;
+  if (!capabilities) {
+    return true;
+  }
+  if (device === 'pump') {
+    return capabilities.pump !== false;
+  }
+  if (device === 'heater') {
+    return capabilities.heater !== false;
+  }
+  return true;
+}
+
+function canRequestAutoMode(device) {
+  if (!isActuatorSupported(device)) {
+    return false;
+  }
+  return true;
 }
 
 function setApiStatus(online, message) {
@@ -154,6 +217,74 @@ function setCommandStatus(message, isError = false) {
   }
   dom.commandStatus.textContent = message;
   dom.commandStatus.classList.toggle('bad', isError);
+}
+
+function closeMobileMenu() {
+  dom.nav?.classList.remove('is-open');
+  dom.menuToggle?.classList.remove('is-open');
+  dom.menuToggle?.setAttribute('aria-expanded', 'false');
+}
+
+function toggleMobileMenu() {
+  if (!dom.nav || !dom.menuToggle) {
+    return;
+  }
+  const nextOpen = !dom.nav.classList.contains('is-open');
+  dom.nav.classList.toggle('is-open', nextOpen);
+  dom.menuToggle.classList.toggle('is-open', nextOpen);
+  dom.menuToggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+}
+
+function updateMobileTopbarState() {
+  if (!dom.topbar) {
+    return;
+  }
+
+  const mobile = window.innerWidth <= 900;
+  if (!mobile) {
+    state.mobileTopbarCompact = false;
+    dom.topbar.classList.remove('is-compact');
+    return;
+  }
+
+  const expandThreshold = 24;
+  const compactThreshold = 72;
+  const nextCompact = state.mobileTopbarCompact
+    ? window.scrollY > expandThreshold
+    : window.scrollY > compactThreshold;
+
+  if (nextCompact === state.mobileTopbarCompact) {
+    return;
+  }
+
+  state.mobileTopbarCompact = nextCompact;
+  dom.topbar.classList.toggle('is-compact', nextCompact);
+
+  if (nextCompact) {
+    closeMobileMenu();
+  }
+}
+
+function setScrollingState(active) {
+  document.body.classList.toggle('is-scrolling', active);
+}
+
+function flushScrollUi() {
+  scrollFramePending = false;
+  updateMobileTopbarState();
+  setScrollingState(true);
+  window.clearTimeout(scrollIdleTimer);
+  scrollIdleTimer = window.setTimeout(() => {
+    setScrollingState(false);
+  }, 120);
+}
+
+function scheduleScrollUiUpdate() {
+  if (scrollFramePending) {
+    return;
+  }
+  scrollFramePending = true;
+  window.requestAnimationFrame(flushScrollUi);
 }
 
 function getNotificationPermission() {
@@ -222,6 +353,9 @@ function computeMetricStatus(value, threshold = {}) {
   const min = threshold.min;
   const max = threshold.max;
 
+  if (!Number.isFinite(value)) {
+    return 'ok';
+  }
   if (min === undefined && max === undefined) {
     return 'ok';
   }
@@ -261,6 +395,32 @@ function updateMetricUI(metric) {
     card.classList.remove('ok', 'warn', 'critical');
     card.classList.add(status);
   });
+
+  renderOpsStrip();
+}
+
+function clearTrendChart(message = '') {
+  const canvas = document.getElementById('trendChart');
+  if (!canvas) {
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return;
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!message) {
+    return;
+  }
+
+  ctx.fillStyle = '#7fa8a2';
+  ctx.font = '14px "Source Sans 3", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+  ctx.textAlign = 'start';
 }
 
 function setDisconnectedUI(reason) {
@@ -273,23 +433,23 @@ function setDisconnectedUI(reason) {
   if (dom.lastUpdate) {
     dom.lastUpdate.textContent = reason;
   }
+  clearTrendChart(reason);
 }
 
-function setLockedUI() {
-  setDisconnectedUI('Authentification requise pour consulter le bassin');
-  if (dom.history) {
-    dom.history.innerHTML = '<p class="form-hint">Connecte-toi pour consulter l historique des mesures.</p>';
+function syncLiveTelemetryUI() {
+  const latestMetric = getLatestMetric();
+  if (!latestMetric) {
+    setDisconnectedUI('Aucune mesure disponible');
+    return;
   }
-  if (dom.logs) {
-    dom.logs.innerHTML = '<p class="form-hint">Connecte-toi pour consulter les journaux et alertes.</p>';
+
+  if (!isDeviceOnline(state.device)) {
+    setDisconnectedUI('ESP32 hors ligne - mesures masquees');
+    return;
   }
-  if (dom.alertList) {
-    dom.alertList.innerHTML = '<p class="form-hint">Connecte-toi pour consulter les alertes du bassin.</p>';
-  }
-  if (dom.alertSummary) {
-    dom.alertSummary.textContent = 'Session requise.';
-  }
-  setCommandStatus('Authentification requise avant toute commande.', true);
+
+  updateMetricUI(latestMetric);
+  drawChart();
 }
 
 function updateThresholdForm() {
@@ -399,31 +559,23 @@ function renderLogs() {
 }
 
 function renderOpsStrip() {
+  const latestMetric = getLatestMetric();
+  const online = isDeviceOnline(state.device);
   if (dom.opsDevice) {
-    dom.opsDevice.textContent = state.device?.online ? 'ESP32 en ligne' : 'ESP32 hors ligne';
+    dom.opsDevice.textContent = online ? 'ESP32 en ligne' : 'ESP32 hors ligne';
   }
   if (dom.opsPump) {
-    dom.opsPump.textContent = state.actuators.pump?.state === 'on' ? 'Pompe en marche' : 'Pompe arretee';
+    dom.opsPump.textContent = state.actuators.pump?.state === 'on' ? 'En marche' : 'Arretee';
+  }
+  if (dom.opsSensors) {
+    const sensorCount = getAvailableSensorCount(latestMetric);
+    dom.opsSensors.textContent = online && sensorCount ? `${sensorCount} / ${SENSOR_KEYS.length}` : '--';
+  }
+  if (dom.opsLastUpdate) {
+    dom.opsLastUpdate.textContent = online && latestMetric?.timestamp ? formatDate(latestMetric.timestamp) : '--';
   }
   if (dom.opsAlerts) {
     dom.opsAlerts.textContent = String(state.alerts.length);
-  }
-  if (dom.opsMail) {
-    const emailSettings = state.notifications?.settings?.email;
-    const hasEmail = Boolean(emailSettings?.enabled && emailSettings.to);
-    const hasBrowser = browserNotificationPrefs.enabled;
-    dom.opsMail.textContent = hasEmail && hasBrowser
-      ? 'Email + navigateur'
-      : hasEmail
-        ? 'Email'
-        : hasBrowser
-          ? 'Notification web'
-          : 'Aucun canal';
-  }
-  if (dom.opsAutomation) {
-    dom.opsAutomation.textContent = state.automation?.settings?.enabled
-      ? 'Regulation active'
-      : 'Pilotage manuel';
   }
 }
 
@@ -431,6 +583,7 @@ function renderEmailNotifications() {
   const snapshot = state.notifications;
   const emailSettings = snapshot?.settings?.email;
   const emailStatus = snapshot?.status;
+  const providerLabel = emailStatus?.provider === 'formsubmit' ? 'FormSubmit' : 'SMTP';
   if (!dom.emailForm || !emailSettings) {
     return;
   }
@@ -450,13 +603,13 @@ function renderEmailNotifications() {
     if (!isAdmin()) {
       dom.emailStatus.textContent = 'Connexion admin requise.';
     } else if (!emailStatus?.emailConfigured) {
-      dom.emailStatus.textContent = 'SMTP non configure sur le serveur.';
+      dom.emailStatus.textContent = `${providerLabel} non configure sur le serveur.`;
     } else if (emailStatus?.lastEmailError) {
       dom.emailStatus.textContent = `Erreur email: ${emailStatus.lastEmailError}`;
     } else if (emailStatus?.lastEmailAt) {
       dom.emailStatus.textContent = `Dernier envoi: ${formatDate(emailStatus.lastEmailAt)}`;
     } else {
-      dom.emailStatus.textContent = 'SMTP pret. Aucun email envoye pour le moment.';
+      dom.emailStatus.textContent = `${providerLabel} pret. Aucun email envoye pour le moment.`;
     }
   }
 
@@ -467,6 +620,8 @@ function renderAutomation() {
   const snapshot = state.automation;
   const settings = snapshot?.settings;
   const status = snapshot?.status;
+  const heaterSupported = isActuatorSupported('heater');
+  const pumpSupported = isActuatorSupported('pump');
   if (!settings) {
     return;
   }
@@ -486,6 +641,16 @@ function renderAutomation() {
     dom.automationForm.querySelectorAll('input, button').forEach((element) => {
       element.disabled = !isAdmin();
     });
+    ['heater_enabled', 'heater_min_temp', 'heater_max_temp'].forEach((name) => {
+      if (dom.automationForm[name]) {
+        dom.automationForm[name].disabled = !isAdmin() || !heaterSupported;
+      }
+    });
+    ['pump_enabled', 'pump_low_level_cutoff', 'pump_turbidity_start', 'pump_turbidity_stop', 'pump_cycle_on_minutes', 'pump_cycle_off_minutes'].forEach((name) => {
+      if (dom.automationForm[name]) {
+        dom.automationForm[name].disabled = !isAdmin() || !pumpSupported;
+      }
+    });
   }
 
   if (dom.automationSummary) {
@@ -500,7 +665,7 @@ function renderAutomation() {
       ? `Derniere action: ${status.lastAction.device} -> ${status.lastAction.state} (${status.lastAction.reason || 'regle'})`
       : 'Aucune action automatique recente.';
     dom.automationSummary.textContent = settings.enabled
-      ? `Automatisation active. Chauffage ${settings.heater?.enabled ? 'regule' : 'ignore'}, pompe ${settings.pump?.enabled ? 'regulee' : 'ignoree'}. ${holds.length ? `Maintien manuel: ${holds.join(', ')}. ` : ''}${lastAction}`
+      ? `Automatisation active. Chauffage ${heaterSupported ? (settings.heater?.enabled ? 'regule' : 'ignore') : 'non supporte'}, pompe ${pumpSupported ? (settings.pump?.enabled ? 'regulee' : 'ignoree') : 'non supportee'}. ${holds.length ? `Maintien manuel: ${holds.join(', ')}. ` : ''}${lastAction}`
       : 'Automatisation inactive. Les actionneurs restent en pilotage manuel via le dashboard ou le firmware.';
   }
 
@@ -525,20 +690,35 @@ function updateActuatorUI(device) {
   if (!nodes || !data) {
     return;
   }
+  const supported = isActuatorSupported(device);
 
   if (nodes.state) {
-    nodes.state.textContent = data.state === 'on' ? 'ON' : 'OFF';
+    nodes.state.textContent = supported ? (data.state === 'on' ? 'En marche' : 'Arretee') : 'Indisponible';
   }
   if (nodes.toggle) {
-    nodes.toggle.textContent = data.state === 'on' ? 'Arreter' : 'Demarrer';
+    nodes.toggle.textContent = supported
+      ? (device === 'pump'
+        ? (data.state === 'on' ? 'Arreter la pompe' : 'Demarrer la pompe')
+        : (data.state === 'on' ? 'Arreter' : 'Demarrer'))
+      : 'Indisponible';
   }
   if (nodes.mode) {
-    if (data.mode === 'manual' && data.manualUntil) {
-      nodes.mode.textContent = `Maintien manuel jusqu'a ${new Date(data.manualUntil).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-    } else if (state.automation?.settings?.enabled) {
-      nodes.mode.textContent = data.automationNote ? `Auto: ${data.automationNote}` : 'Auto supervision';
+    if (!supported) {
+      nodes.mode.textContent = 'Non supporte';
+      nodes.mode.title = 'Actionneur indisponible sur ce firmware';
+    } else if (data.mode === 'manual' && canRequestAutoMode(device)) {
+      nodes.mode.textContent = 'Passer en AUTO';
+      nodes.mode.title = data.manualUntil
+        ? `Maintien manuel jusqu'a ${new Date(data.manualUntil).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+        : 'Repasser en mode automatique';
+    } else if (data.mode === 'manual') {
+      nodes.mode.textContent = 'AUTO indisponible';
+      nodes.mode.title = 'Le firmware courant ne supporte pas cette commande AUTO';
     } else {
-      nodes.mode.textContent = 'Auto firmware';
+      nodes.mode.textContent = 'AUTO actif';
+      nodes.mode.title = state.automation?.settings?.enabled
+        ? (data.automationNote ? `Auto: ${data.automationNote}` : 'Mode automatique pilote par le serveur')
+        : 'Mode automatique pilote par le firmware';
     }
     nodes.mode.classList.add('outline');
   }
@@ -550,11 +730,13 @@ function updateControlsAvailability() {
   const canWrite = isAdmin() && deviceCanReceiveCommands();
   Object.entries(actuatorNodes).forEach(([device, nodes]) => {
     const pending = pendingActuators.has(device);
+    const supported = isActuatorSupported(device);
+    const current = state.actuators[device];
     if (nodes.toggle) {
-      nodes.toggle.disabled = !canWrite || pending;
+      nodes.toggle.disabled = !canWrite || pending || !supported;
     }
     if (nodes.mode) {
-      nodes.mode.disabled = true;
+      nodes.mode.disabled = !canWrite || pending || current?.mode === 'auto' || !canRequestAutoMode(device);
     }
   });
 
@@ -572,7 +754,7 @@ function updateControlsAvailability() {
     } else if (!deviceCanReceiveCommands()) {
       dom.thresholdStatus.textContent = 'ESP32 hors ligne, commandes suspendues.';
     } else {
-      dom.thresholdStatus.textContent = 'Seuils modifiables (admin). Commandes ESP32: ON/OFF.';
+      dom.thresholdStatus.textContent = 'Seuils modifiables (admin). Commandes ESP32: ON/OFF/AUTO.';
     }
   }
 }
@@ -595,19 +777,16 @@ function renderSystem() {
     dom.systemStatus.classList.toggle('bad', !ok);
   }
   if (dom.systemMessage) {
-    const mqtt = info.mqtt || {};
-    const mqttNote = mqtt.error ? ` | MQTT: ${mqtt.error}` : '';
-    dom.systemMessage.textContent = `${info.message || info.note || '--'}${mqttNote}`;
+    dom.systemMessage.textContent = info.message || info.note || '--';
   }
 
-  const mqtt = info.mqtt || {};
   if (dom.connection) {
-    if (state.device?.online) {
+    if (isDeviceOnline(state.device)) {
       dom.connection.textContent = 'Connecte';
-    } else if (mqtt.connected) {
-      dom.connection.textContent = 'En attente ESP32';
+    } else if (state.device?.lastSeen) {
+      dom.connection.textContent = 'Hors ligne';
     } else {
-      dom.connection.textContent = 'Non connecte';
+      dom.connection.textContent = 'En attente ESP32';
     }
   }
 
@@ -621,9 +800,11 @@ function renderDevice() {
     return;
   }
 
+  const online = isDeviceOnline(device);
+
   if (dom.deviceStatus) {
-    dom.deviceStatus.textContent = device.online ? 'En ligne' : 'Hors ligne';
-    dom.deviceStatus.classList.toggle('bad', !device.online);
+    dom.deviceStatus.textContent = online ? 'En ligne' : 'Hors ligne';
+    dom.deviceStatus.classList.toggle('bad', !online);
   }
   if (dom.deviceLastSeen) {
     dom.deviceLastSeen.textContent = formatDate(device.lastSeen);
@@ -635,14 +816,35 @@ function renderDevice() {
     dom.deviceRssi.textContent = Number.isFinite(device.rssi) ? `${device.rssi} dBm` : '--';
   }
 
-  if (device.lastCommand?.requestedAt) {
-    setCommandStatus(`Dernier ordre: ${device.lastCommand.device} -> ${device.lastCommand.state} (${formatDate(device.lastCommand.requestedAt)})`);
-  } else if (!device.online && state.system?.mqtt?.enabled) {
-    setCommandStatus('Dernier ordre: attente connexion ESP32', true);
+  if (!isAdmin()) {
+    setCommandStatus('Connexion admin requise pour piloter la pompe.', true);
+  } else if (device.lastCommand?.requestedAt) {
+    setCommandStatus(`Dernier ordre: ${getDeviceLabel(device.lastCommand.device)} -> ${device.lastCommand.state} (${formatDate(device.lastCommand.requestedAt)})`);
+  } else if (!online) {
+    setCommandStatus('Dernier ordre: ESP32 hors ligne, synchro au prochain retour.', true);
   }
 
+  syncLiveTelemetryUI();
   updateControlsAvailability();
   renderOpsStrip();
+}
+
+function refreshPresenceState() {
+  if (!state.device) {
+    return;
+  }
+
+  const online = isDeviceOnline(state.device);
+  if (state.device.online === online) {
+    return;
+  }
+
+  state.device = {
+    ...state.device,
+    online,
+  };
+  renderSystem();
+  renderDevice();
 }
 
 function updateAuthUI(user) {
@@ -654,6 +856,9 @@ function updateAuthUI(user) {
     dom.authStatus.textContent = authenticated
       ? `Session: ${state.auth.username} (${state.auth.role})`
       : 'Session: visiteur';
+  }
+  if (dom.authOpen) {
+    dom.authOpen.style.display = authenticated ? 'none' : 'inline-flex';
   }
   if (dom.authLogout) {
     dom.authLogout.style.display = authenticated ? 'inline-flex' : 'none';
@@ -682,7 +887,7 @@ function updateAuthUI(user) {
   renderEmailNotifications();
   renderAutomation();
   if (!authenticated) {
-    setLockedUI();
+    setCommandStatus('Connexion admin requise pour piloter la pompe.', true);
   }
 }
 
@@ -741,7 +946,7 @@ function drawChart() {
 
   ctx.fillStyle = '#5b6b73';
   ctx.font = '12px "Source Sans 3", sans-serif';
-  ctx.fillText('Temp vs pH', padding, padding - 10);
+  ctx.fillText('Temperature / pH', padding, padding - 10);
 }
 
 function applyDashboard(payload) {
@@ -754,11 +959,14 @@ function applyDashboard(payload) {
   state.automation = payload.automation || null;
   state.system = payload.system || null;
   state.device = payload.device || null;
+  if (state.device) {
+    state.device.online = isDeviceOnline(state.device);
+  }
   seenAlertIds.clear();
   state.alerts.forEach((alert) => seenAlertIds.add(alert.id));
 
   updateThresholdForm();
-  updateMetricUI(payload.latestMetric || state.history[state.history.length - 1]);
+  syncLiveTelemetryUI();
   renderAlerts();
   renderHistory();
   renderLogs();
@@ -770,11 +978,6 @@ function applyDashboard(payload) {
   renderSystem();
   renderDevice();
   renderOpsStrip();
-  drawChart();
-
-  if (!payload.latestMetric && !state.history.length) {
-    setDisconnectedUI('Aucune mesure disponible');
-  }
 }
 
 function pushMetric(metric) {
@@ -793,9 +996,8 @@ function pushMetric(metric) {
     state.history = state.history.slice(-120);
   }
 
-  updateMetricUI(metric);
+  syncLiveTelemetryUI();
   renderHistory();
-  drawChart();
 }
 
 async function fetchDashboard() {
@@ -810,13 +1012,13 @@ async function fetchAuth() {
 
 async function refreshData() {
   await fetchAuth();
-  if (!isAuthenticated()) {
-    setLockedUI();
-    setApiStatus(true, 'API: en ligne, connexion requise');
-    return;
-  }
   await fetchDashboard();
-  setApiStatus(true, state.sseConnected ? 'API: en ligne + temps reel' : 'API: en ligne');
+  setApiStatus(
+    true,
+    isAuthenticated()
+      ? (state.sseConnected ? 'API: en ligne + temps reel' : 'API: en ligne')
+      : 'API: en ligne, lecture capteurs'
+  );
 }
 
 async function safeTask(task) {
@@ -825,7 +1027,12 @@ async function safeTask(task) {
   } catch (error) {
     if (error.message === 'Unauthorized') {
       updateAuthUI({ role: 'visitor' });
-      setApiStatus(true, 'API: en ligne, connexion requise');
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      state.sseConnected = false;
+      await refreshData();
       return;
     }
     setApiStatus(false, `API: erreur (${error.message})`);
@@ -849,9 +1056,12 @@ async function sendActuatorCommand(device, payload) {
     });
     state.actuators[device] = result.actuator;
     updateActuatorUI(device);
-    setCommandStatus(`Dernier ordre: ${device} -> ${result.actuator.state} (${result.delivery?.channel || 'local'})`);
+    const actionLabel = payload.mode === 'auto'
+      ? 'auto'
+      : (result.actuator.state === 'on' ? 'marche' : 'arret');
+    setCommandStatus(`Dernier ordre: ${getDeviceLabel(device)} -> ${actionLabel} (${result.delivery?.channel || 'local'})`);
   } catch (error) {
-    setCommandStatus(`Echec commande ${device}: ${error.message}`, true);
+    setCommandStatus(`Echec commande ${getDeviceLabel(device)}: ${error.message}`, true);
     throw error;
   } finally {
     pendingActuators.delete(device);
@@ -889,11 +1099,35 @@ function exportCsv() {
 }
 
 function setupControls() {
+  dom.menuToggle?.addEventListener('click', toggleMobileMenu);
+
+  dom.nav?.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', () => {
+      closeMobileMenu();
+    });
+  });
+
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 900) {
+      closeMobileMenu();
+    }
+    updateMobileTopbarState();
+  });
+
+  window.addEventListener('scroll', scheduleScrollUiUpdate, { passive: true });
+  updateMobileTopbarState();
+
   Object.keys(actuatorNodes).forEach((device) => {
     actuatorNodes[device].toggle?.addEventListener('click', async () => {
       const current = state.actuators[device];
       const nextState = current?.state === 'on' ? 'off' : 'on';
       await safeTask(() => sendActuatorCommand(device, { state: nextState }));
+    });
+    actuatorNodes[device].mode?.addEventListener('click', async () => {
+      if (state.actuators[device]?.mode === 'auto') {
+        return;
+      }
+      await safeTask(() => sendActuatorCommand(device, { mode: 'auto' }));
     });
   });
 
@@ -939,6 +1173,7 @@ function setupControls() {
     button.addEventListener('click', () => {
       const target = button.dataset.scroll;
       document.getElementById(target)?.scrollIntoView({ behavior: 'smooth' });
+      closeMobileMenu();
     });
   });
 
@@ -947,6 +1182,7 @@ function setupControls() {
       const target = button.dataset.adminScroll;
       const section = document.querySelector(`.${target}`) || document.getElementById(target);
       section?.scrollIntoView({ behavior: 'smooth' });
+      closeMobileMenu();
     });
   });
 
@@ -1086,21 +1322,30 @@ function setupAuth() {
         eventSource = null;
         state.sseConnected = false;
       }
-      setLockedUI();
+      await refreshData();
     });
   });
 }
 
 function setupReveal() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('.reveal').forEach((section) => section.classList.add('is-visible'));
+    return;
+  }
+
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
           entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
         }
       });
     },
-    { threshold: 0.2 }
+    {
+      threshold: 0.16,
+      rootMargin: '0px 0px -8% 0px',
+    }
   );
 
   document.querySelectorAll('.reveal').forEach((section) => observer.observe(section));
@@ -1114,7 +1359,10 @@ function handleServerEvent(type, data) {
   }
 
   if (type === 'device') {
-    state.device = data;
+    state.device = {
+      ...data,
+      online: isDeviceOnline(data),
+    };
     renderDevice();
     return;
   }
@@ -1144,7 +1392,7 @@ function handleServerEvent(type, data) {
   if (type === 'thresholds') {
     state.thresholds = data || {};
     updateThresholdForm();
-    updateMetricUI(state.history[state.history.length - 1]);
+    syncLiveTelemetryUI();
     return;
   }
 
@@ -1221,6 +1469,10 @@ async function init() {
   setInterval(() => {
     safeTask(fetchAuth);
   }, 60000);
+
+  setInterval(() => {
+    refreshPresenceState();
+  }, 250);
 }
 
 init();

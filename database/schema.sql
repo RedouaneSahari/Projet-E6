@@ -1,4 +1,7 @@
--- Generic SQL schema (SQLite/MySQL compatible)
+-- SQLite schema
+-- Utilise uniquement si DATA_BACKEND=sqlite
+-- Stocke l'historique des mesures dans un fichier local: storage/metrics.sqlite
+
 CREATE TABLE IF NOT EXISTS metrics (
   timestamp TEXT PRIMARY KEY,
   temperature REAL,
@@ -7,6 +10,3 @@ CREATE TABLE IF NOT EXISTS metrics (
   water_level REAL,
   humidity REAL
 );
-
--- Example query
--- SELECT * FROM metrics ORDER BY timestamp DESC LIMIT 60;

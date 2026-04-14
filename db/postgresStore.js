@@ -1,3 +1,11 @@
+function toNullableNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function createPostgresStore({ seedFn, historyLimit = 120 }) {
   let pool;
   let pg;
@@ -25,11 +33,11 @@ function createPostgresStore({ seedFn, historyLimit = 120 }) {
 
   const normalizeRow = (row) => ({
     timestamp: row.timestamp,
-    temperature: Number(row.temperature),
-    ph: Number(row.ph),
-    turbidity: Number(row.turbidity),
-    water_level: Number(row.water_level),
-    humidity: Number(row.humidity),
+    temperature: toNullableNumber(row.temperature),
+    ph: toNullableNumber(row.ph),
+    turbidity: toNullableNumber(row.turbidity),
+    water_level: toNullableNumber(row.water_level),
+    humidity: toNullableNumber(row.humidity),
   });
 
   return {

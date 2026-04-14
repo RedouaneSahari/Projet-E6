@@ -1,5 +1,14 @@
 node_modules/
 .env
+.env.ngrok
+.vscode/
 storage/metrics.sqlite
+storage/metrics.json
+storage/thresholds.json
+storage/actuators.json
+storage/alerts.json
+storage/notifications.json
+storage/automation.json
+storage/logs/actuators.log
 storage/logs/server.out.log
 storage/logs/server.err.log

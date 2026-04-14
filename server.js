@@ -4,7 +4,6 @@ const fsPromises = require('fs/promises');
 const path = require('path');
 const { URL } = require('url');
 const crypto = require('crypto');
-const mqtt = require('mqtt');
 const nodemailer = require('nodemailer');
 const { createStore } = require('./db');
 
@@ -22,19 +21,18 @@ const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 const TECH_USER = process.env.TECH_USER || 'technicien';
 const TECH_PASS = process.env.TECH_PASS || 'tech123';
-const MQTT_ENABLED = (process.env.MQTT_ENABLED || '1') === '1';
-const MQTT_URL = process.env.MQTT_URL || 'mqtt://localhost:1883';
-const MQTT_METRICS_TOPIC = process.env.MQTT_TOPIC || 'tp/esp32/telemetry';
-const MQTT_COMMAND_TOPIC = process.env.MQTT_COMMAND_TOPIC || 'tp/esp32/cmd';
-const MQTT_STATE_TOPIC = process.env.MQTT_STATE_TOPIC || 'tp/esp32/state';
-const MQTT_CLIENT_ID = process.env.MQTT_CLIENT_ID || 'projet-e6-server';
-const MQTT_DEVICE_TIMEOUT_MS = Number(process.env.MQTT_DEVICE_TIMEOUT_MS || 30000);
+const DEVICE_TIMEOUT_MS = Number(process.env.DEVICE_TIMEOUT_MS || 30000);
 const SMTP_URL = process.env.SMTP_URL || '';
 const SMTP_HOST = process.env.SMTP_HOST || '';
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
 const SMTP_SECURE = (process.env.SMTP_SECURE || '0') === '1';
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
+const ALERT_EMAIL_MODE = String(process.env.ALERT_EMAIL_MODE || 'smtp').trim().toLowerCase();
+const FORMSUBMIT_BASE_URL = String(process.env.FORMSUBMIT_BASE_URL || 'https://formsubmit.co').trim();
+const FORMSUBMIT_TEMPLATE = String(process.env.FORMSUBMIT_TEMPLATE || 'table').trim() || 'table';
+const FORMSUBMIT_DISABLE_CAPTCHA = (process.env.FORMSUBMIT_DISABLE_CAPTCHA || '1') === '1';
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`).trim();
 const ALERT_EMAIL_FROM = process.env.ALERT_EMAIL_FROM || '';
 const ALERT_EMAIL_TO = process.env.ALERT_EMAIL_TO || '';
 const RESPONSE_JSON_INDENT = process.env.NODE_ENV === 'development' ? 2 : 0;
@@ -96,6 +94,16 @@ const DEFAULT_AUTOMATION_SETTINGS = {
   },
 };
 
+function createDefaultDeviceCapabilities() {
+  return {
+    pump: true,
+    heater: true,
+    waterLevel: true,
+    humidity: true,
+    pumpAutoCommand: false,
+  };
+}
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -121,13 +129,13 @@ function createDefaultDeviceState() {
     lastTelemetry: null,
     lastState: null,
     lastCommand: null,
+    capabilities: createDefaultDeviceCapabilities(),
     pump: actuators.pump,
     heater: actuators.heater,
   };
 }
 
 let store;
-let mqttClient = null;
 let emailTransporter = null;
 
 const sessions = new Map();
@@ -152,23 +160,6 @@ const runtimeState = {
     lastActionAt: null,
     lastAction: null,
   },
-};
-
-let mqttStatus = {
-  enabled: false,
-  connected: false,
-  url: MQTT_URL,
-  metricsTopic: MQTT_METRICS_TOPIC,
-  commandTopic: MQTT_COMMAND_TOPIC,
-  stateTopic: MQTT_STATE_TOPIC,
-  lastMessage: null,
-  lastState: null,
-  error: null,
-};
-
-let mqttLastLog = {
-  message: null,
-  time: 0,
 };
 
 function ensureDir(dirPath) {
@@ -240,6 +231,10 @@ function round(value, digits) {
   return Math.round(value * factor) / factor;
 }
 
+function roundOptional(value, digits) {
+  return Number.isFinite(value) ? round(value, digits) : null;
+}
+
 function normalizeAdcToPercent(value) {
   return round(clamp((value / 4095) * 100, 0, 100), 1);
 }
@@ -262,34 +257,91 @@ function normalizeBinaryState(value, fallback = 'off') {
   return fallback;
 }
 
+function normalizeOptionalNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function normalizeDeviceMode(value, fallback = 'auto') {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'manual' || normalized === 'manuel') {
+    return 'manual';
+  }
+  if (normalized === 'auto') {
+    return 'auto';
+  }
+  return fallback;
+}
+
+function normalizeDeviceCapabilities(update, fallback = createDefaultDeviceCapabilities()) {
+  const base = fallback && typeof fallback === 'object' ? fallback : createDefaultDeviceCapabilities();
+  const source = update && typeof update === 'object' ? update : {};
+  return {
+    pump: source.pump !== undefined ? Boolean(source.pump) : Boolean(base.pump),
+    heater: source.heater !== undefined ? Boolean(source.heater) : Boolean(base.heater),
+    waterLevel: source.waterLevel !== undefined ? Boolean(source.waterLevel) : Boolean(base.waterLevel),
+    humidity: source.humidity !== undefined ? Boolean(source.humidity) : Boolean(base.humidity),
+    pumpAutoCommand: source.pumpAutoCommand !== undefined ? Boolean(source.pumpAutoCommand) : Boolean(base.pumpAutoCommand),
+  };
+}
+
+function inferDeviceCapabilities(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const inferred = {};
+  const isPumpOnlyMqttSketch = payload.mode !== undefined || (payload.pump !== undefined && typeof payload.pump !== 'object');
+
+  if (isPumpOnlyMqttSketch) {
+    inferred.pump = true;
+    inferred.heater = false;
+    inferred.pumpAutoCommand = true;
+  }
+
+  if (payload.heater !== undefined || payload.heater_state !== undefined) {
+    inferred.heater = true;
+  }
+
+  if (payload.water_level !== undefined || payload.waterLevel !== undefined) {
+    inferred.waterLevel = true;
+  } else if (isPumpOnlyMqttSketch) {
+    inferred.waterLevel = false;
+  }
+
+  if (payload.humidity !== undefined) {
+    inferred.humidity = true;
+  } else if (isPumpOnlyMqttSketch) {
+    inferred.humidity = false;
+  }
+
+  return Object.keys(inferred).length ? inferred : null;
+}
+
+function deviceSupportsActuator(device) {
+  const capabilities = runtimeState.device?.capabilities || createDefaultDeviceCapabilities();
+  if (device === 'pump') {
+    return capabilities.pump !== false;
+  }
+  if (device === 'heater') {
+    return capabilities.heater !== false;
+  }
+  return true;
+}
+
+function deviceSupportsAutoMode(device) {
+  return deviceSupportsActuator(device);
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
-}
-
-function rand(min, max) {
-  return min + Math.random() * (max - min);
-}
-
-function seedMetrics() {
-  const now = Date.now();
-  const items = [];
-  for (let i = 11; i >= 0; i -= 1) {
-    const timestamp = new Date(now - i * 10 * 60 * 1000).toISOString();
-    const temp = 24.2 + Math.sin(i / 3) * 0.8;
-    const ph = 7.2 + Math.cos(i / 4) * 0.2;
-    const turb = 14 + Math.sin(i / 2) * 3;
-    const level = 78 + Math.cos(i / 5) * 4;
-    const hum = 52 + Math.sin(i / 6) * 5;
-    items.push({
-      timestamp,
-      temperature: round(temp, 1),
-      ph: round(ph, 2),
-      turbidity: round(turb, 1),
-      water_level: round(level, 1),
-      humidity: round(hum, 1),
-    });
-  }
-  return items;
 }
 
 function ensureSeed() {
@@ -429,10 +481,16 @@ function normalizeAutomationSettings(payload) {
 }
 
 function isEmailConfigured() {
+  if (ALERT_EMAIL_MODE === 'formsubmit') {
+    return Boolean(FORMSUBMIT_BASE_URL);
+  }
   return Boolean(ALERT_EMAIL_FROM) && Boolean(SMTP_URL || SMTP_HOST);
 }
 
 function getEmailTransporter() {
+  if (ALERT_EMAIL_MODE === 'formsubmit') {
+    return null;
+  }
   if (!isEmailConfigured()) {
     return null;
   }
@@ -462,6 +520,7 @@ function buildNotificationSnapshot() {
     status: {
       ...runtimeState.notificationStatus,
       emailConfigured: isEmailConfigured(),
+      provider: ALERT_EMAIL_MODE === 'formsubmit' ? 'formsubmit' : 'smtp',
     },
   };
 }
@@ -662,6 +721,9 @@ function serveStatic(req, res, pathname) {
 }
 
 function computeStatus(value, min, max) {
+  if (!Number.isFinite(value)) {
+    return 'ok';
+  }
   if (min === undefined && max === undefined) {
     return 'ok';
   }
@@ -706,7 +768,7 @@ function broadcastAutomationSnapshot() {
 function buildDeviceSnapshot() {
   const device = runtimeState.device;
   const lastSeenMs = device.lastSeen ? Date.parse(device.lastSeen) : NaN;
-  const online = Number.isFinite(lastSeenMs) && (Date.now() - lastSeenMs) <= MQTT_DEVICE_TIMEOUT_MS;
+  const online = Number.isFinite(lastSeenMs) && (Date.now() - lastSeenMs) <= DEVICE_TIMEOUT_MS;
 
   return {
     ...device,
@@ -714,7 +776,7 @@ function buildDeviceSnapshot() {
   };
 }
 
-function applyDeviceState(update, source = 'mqtt') {
+function applyDeviceState(update, source = 'device') {
   const next = {
     ...runtimeState.device,
     ...(update.deviceId ? { deviceId: update.deviceId } : {}),
@@ -726,6 +788,9 @@ function applyDeviceState(update, source = 'mqtt') {
     ...(update.lastSeen ? { lastSeen: update.lastSeen } : {}),
     ...(update.lastTelemetry ? { lastTelemetry: update.lastTelemetry } : {}),
     ...(update.lastState ? { lastState: update.lastState } : {}),
+    capabilities: update.capabilities
+      ? normalizeDeviceCapabilities(update.capabilities, runtimeState.device.capabilities)
+      : runtimeState.device.capabilities,
     pump: update.pump ? normalizeActuatorRecord(update.pump, runtimeState.device.pump) : runtimeState.device.pump,
     heater: update.heater ? normalizeActuatorRecord(update.heater, runtimeState.device.heater) : runtimeState.device.heater,
     lastCommand: update.lastCommand ? update.lastCommand : runtimeState.device.lastCommand,
@@ -788,12 +853,10 @@ function normalizeMetricPayload(payload) {
   const phValue = payload.ph !== undefined ? Number(payload.ph) : Number.NaN;
   const phAdcValue = payload.ph_adc !== undefined ? Number(payload.ph_adc) : Number.NaN;
   const rawTurbidity = payload.turbidity !== undefined ? Number(payload.turbidity) : Number.NaN;
-  const rawWaterLevel = payload.water_level !== undefined
-    ? Number(payload.water_level)
-    : payload.waterLevel !== undefined
-      ? Number(payload.waterLevel)
-      : Number.NaN;
-  const humidityInput = payload.humidity !== undefined ? Number(payload.humidity) : 50;
+  const rawWaterLevel = normalizeOptionalNumber(
+    payload.water_level !== undefined ? payload.water_level : payload.waterLevel
+  );
+  const humidityInput = normalizeOptionalNumber(payload.humidity);
 
   const ph = Number.isFinite(phValue)
     ? phValue
@@ -803,18 +866,23 @@ function normalizeMetricPayload(payload) {
   const turbidity = Number.isFinite(rawTurbidity)
     ? (rawTurbidity > 100 ? normalizeAdcToTurbidity(rawTurbidity) : rawTurbidity)
     : Number.NaN;
-  const waterLevel = Number.isFinite(rawWaterLevel)
+  const waterLevel = rawWaterLevel !== null
     ? (rawWaterLevel > 100 ? normalizeAdcToPercent(rawWaterLevel) : rawWaterLevel)
-    : Number.NaN;
+    : null;
   const humidity = humidityInput;
 
   const invalid = [
     ['temperature', temperature],
     ['ph', ph],
     ['turbidity', turbidity],
-    ['water_level', waterLevel],
-    ['humidity', humidity],
   ].filter(([, value]) => !Number.isFinite(value));
+
+  if (waterLevel !== null && !Number.isFinite(waterLevel)) {
+    invalid.push(['water_level', waterLevel]);
+  }
+  if (humidity !== null && !Number.isFinite(humidity)) {
+    invalid.push(['humidity', humidity]);
+  }
 
   if (invalid.length) {
     throw new Error(`Invalid metrics: ${invalid.map(([key]) => key).join(', ')}`);
@@ -825,8 +893,8 @@ function normalizeMetricPayload(payload) {
     temperature: round(temperature, 1),
     ph: round(ph, 2),
     turbidity: round(turbidity, 1),
-    water_level: round(waterLevel, 1),
-    humidity: round(humidity, 1),
+    water_level: roundOptional(waterLevel, 1),
+    humidity: roundOptional(humidity, 1),
   };
 }
 
@@ -847,6 +915,9 @@ function extractDeviceMetadata(payload, fallbackTimestamp) {
     lastSeen: fallbackTimestamp,
     lastTelemetry: fallbackTimestamp,
   };
+  const inferredCapabilities = payload.capabilities && typeof payload.capabilities === 'object'
+    ? normalizeDeviceCapabilities(payload.capabilities, runtimeState.device.capabilities)
+    : inferDeviceCapabilities(payload);
 
   if (ip) {
     update.ip = ip;
@@ -862,6 +933,9 @@ function extractDeviceMetadata(payload, fallbackTimestamp) {
   }
   if (Number.isFinite(uptimeMs)) {
     update.uptimeMs = uptimeMs;
+  }
+  if (inferredCapabilities) {
+    update.capabilities = inferredCapabilities;
   }
   if (payload.pump && typeof payload.pump === 'object') {
     update.pump = payload.pump;
@@ -879,6 +953,30 @@ function extractDeviceMetadata(payload, fallbackTimestamp) {
         : fallbackTimestamp,
     };
   }
+  if (payload.pump !== undefined && typeof payload.pump !== 'object') {
+    const currentPump = runtimeState.actuators.pump;
+    const nextPumpState = normalizeBinaryState(payload.pump, currentPump.state);
+    const nextPumpMode = normalizeDeviceMode(payload.mode, currentPump.mode);
+    update.pump = {
+      state: nextPumpState,
+      mode: nextPumpMode,
+      lastChanged: currentPump.state === nextPumpState && currentPump.mode === nextPumpMode
+        ? currentPump.lastChanged
+        : fallbackTimestamp,
+      manualUntil: null,
+      automationNote: null,
+    };
+  } else if (payload.mode !== undefined) {
+    const currentPump = runtimeState.actuators.pump;
+    const nextPumpMode = normalizeDeviceMode(payload.mode, currentPump.mode);
+    update.pump = {
+      state: currentPump.state,
+      mode: nextPumpMode,
+      lastChanged: currentPump.mode === nextPumpMode ? currentPump.lastChanged : fallbackTimestamp,
+      manualUntil: null,
+      automationNote: null,
+    };
+  }
   if (payload.heater_state !== undefined) {
     const nextHeaterState = normalizeBinaryState(payload.heater_state, runtimeState.actuators.heater.state);
     update.heater = {
@@ -891,30 +989,6 @@ function extractDeviceMetadata(payload, fallbackTimestamp) {
   }
 
   return update;
-}
-
-function normalizeStatePayload(payload) {
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('Invalid state payload');
-  }
-
-  const timestamp = payload.timestamp || payload.time || new Date().toISOString();
-  if (Number.isNaN(Date.parse(timestamp))) {
-    throw new Error('Invalid state timestamp');
-  }
-
-  return {
-    deviceId: String(payload.deviceId || payload.device_id || runtimeState.device.deviceId || 'esp32').trim(),
-    firmware: typeof payload.firmware === 'string' ? payload.firmware.trim() : null,
-    ip: typeof payload.ip === 'string' ? payload.ip.trim() : null,
-    rssi: Number(payload.rssi),
-    freeHeap: Number(payload.freeHeap ?? payload.free_heap),
-    uptimeMs: Number(payload.uptimeMs ?? payload.uptime_ms),
-    lastSeen: timestamp,
-    lastState: timestamp,
-    pump: payload.pump,
-    heater: payload.heater,
-  };
 }
 
 function updateAlerts(metric) {
@@ -935,7 +1009,7 @@ function updateAlerts(metric) {
   checks.forEach((check) => {
     const entry = runtimeState.thresholds[check.key] || {};
     const value = metric[check.key];
-    if (value === undefined) {
+    if (!Number.isFinite(value)) {
       return;
     }
 
@@ -993,9 +1067,7 @@ function updateAlerts(metric) {
 
 async function sendAlertEmails(alerts) {
   const settings = runtimeState.notifications.email;
-  const transporter = getEmailTransporter();
-
-  if (!settings.enabled || !settings.to || !transporter) {
+  if (!settings.enabled || !settings.to || !isEmailConfigured()) {
     return;
   }
 
@@ -1008,12 +1080,54 @@ async function sendAlertEmails(alerts) {
     .map((alert) => `- ${alert.message} | ${alert.type} | ${alert.severity} | ${alert.timestamp}`)
     .join('\n');
 
-  await transporter.sendMail({
-    from: ALERT_EMAIL_FROM,
-    to: settings.to,
-    subject: `[Projet E6] ${selectedAlerts.length} alerte(s) bassin`,
-    text: `De nouvelles alertes ont ete detectees sur le bassin.\n\n${text}\n`,
-  });
+  const subject = `[Projet E6] ${selectedAlerts.length} alerte(s) bassin`;
+  const body = `De nouvelles alertes ont ete detectees sur le bassin.\n\n${text}\n`;
+
+  if (ALERT_EMAIL_MODE === 'formsubmit') {
+    const endpoint = `${FORMSUBMIT_BASE_URL.replace(/\/+$/, '')}/ajax/${encodeURIComponent(settings.to)}`;
+    const payload = {
+      name: 'Projet E6',
+      message: body,
+      _subject: subject,
+      _template: FORMSUBMIT_TEMPLATE,
+      _url: PUBLIC_BASE_URL,
+    };
+    if (FORMSUBMIT_DISABLE_CAPTCHA) {
+      payload._captcha = 'false';
+    }
+    if (ALERT_EMAIL_FROM) {
+      payload._replyto = ALERT_EMAIL_FROM;
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Origin: PUBLIC_BASE_URL,
+        Referer: `${PUBLIC_BASE_URL.replace(/\/+$/, '')}/`,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    const success = data.success === true || data.success === 'true';
+    if (!response.ok || !success) {
+      throw new Error(data.message || data.error || `FormSubmit HTTP ${response.status}`);
+    }
+  } else {
+    const transporter = getEmailTransporter();
+    if (!transporter) {
+      return;
+    }
+
+    await transporter.sendMail({
+      from: ALERT_EMAIL_FROM,
+      to: settings.to,
+      subject,
+      text: body,
+    });
+  }
 
   runtimeState.notificationStatus.lastEmailAt = new Date().toISOString();
   runtimeState.notificationStatus.lastEmailError = null;
@@ -1082,7 +1196,6 @@ async function persistActuatorAndDevice(device, actuator, source, delivery) {
       source,
       topic: delivery.topic || null,
       channel: delivery.channel || source,
-      mqttCommand: delivery.mqttCommand || null,
     } : undefined,
   }, source);
   await appendActuatorLog({
@@ -1104,33 +1217,6 @@ function appendActuatorLog(entry) {
   return appendFile(paths.log, line);
 }
 
-function publishMqtt(topic, payload, options = { qos: 1 }) {
-  return new Promise((resolve, reject) => {
-    if (!mqttClient || !mqttClient.connected) {
-      reject(new Error('Broker MQTT indisponible'));
-      return;
-    }
-
-    mqttClient.publish(topic, payload, options, (error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve();
-    });
-  });
-}
-
-function buildLegacyCommand(device, state) {
-  if (device === 'pump') {
-    return state === 'on' ? 'PUMP_ON' : 'PUMP_OFF';
-  }
-  if (device === 'heater') {
-    return state === 'on' ? 'HEATER_ON' : 'HEATER_OFF';
-  }
-  return null;
-}
-
 async function dispatchActuatorCommand(device, actuator) {
   const command = {
     device,
@@ -1140,62 +1226,17 @@ async function dispatchActuatorCommand(device, actuator) {
     source: 'dashboard',
   };
 
-  if (!MQTT_ENABLED) {
-    const channel = buildDeviceSnapshot().online ? 'http-poll' : 'local';
-    runtimeState.device.lastCommand = {
-      ...command,
-      topic: null,
-      channel,
-    };
-    broadcastEvent('device', buildDeviceSnapshot());
-    return {
-      delivered: channel !== 'local',
-      channel,
-      topic: null,
-    };
-  }
-
-  if (mqttClient && mqttClient.connected) {
-    if (!buildDeviceSnapshot().online) {
-      throw new Error('ESP32 hors ligne');
-    }
-
-    const mqttCommand = buildLegacyCommand(device, actuator.state);
-    if (!mqttCommand) {
-      throw new Error('Commande non supportee');
-    }
-
-    await publishMqtt(MQTT_COMMAND_TOPIC, mqttCommand);
-    runtimeState.device.lastCommand = {
-      ...command,
-      topic: MQTT_COMMAND_TOPIC,
-      channel: 'mqtt',
-      mqttCommand,
-    };
-    broadcastEvent('device', buildDeviceSnapshot());
-
-    return {
-      delivered: true,
-      channel: 'mqtt',
-      topic: MQTT_COMMAND_TOPIC,
-      mqttCommand,
-    };
-  }
-
-  if (!buildDeviceSnapshot().online) {
-    throw new Error('ESP32 hors ligne');
-  }
-
+  const channel = buildDeviceSnapshot().online ? 'http-poll' : 'local';
   runtimeState.device.lastCommand = {
     ...command,
     topic: null,
-    channel: 'http-poll',
+    channel,
   };
   broadcastEvent('device', buildDeviceSnapshot());
 
   return {
-    delivered: true,
-    channel: 'http-poll',
+    delivered: channel !== 'local',
+    channel,
     topic: null,
   };
 }
@@ -1204,6 +1245,9 @@ async function executeActuatorChange(device, nextState, source = 'dashboard', au
   const current = runtimeState.actuators[device];
   if (!current) {
     throw new Error('Unknown actuator');
+  }
+  if (!deviceSupportsActuator(device)) {
+    throw new Error('Actionneur non supporte par le firmware courant');
   }
 
   const now = new Date();
@@ -1237,6 +1281,36 @@ async function executeActuatorChange(device, nextState, source = 'dashboard', au
   };
 }
 
+async function executeActuatorAutoMode(device, source = 'dashboard') {
+  const current = runtimeState.actuators[device];
+  if (!current) {
+    throw new Error('Unknown actuator');
+  }
+  if (!deviceSupportsAutoMode(device)) {
+    throw new Error('Retour au mode auto non supporte pour cet actionneur');
+  }
+
+  const timestamp = new Date().toISOString();
+  const updated = {
+    ...current,
+    mode: 'auto',
+    lastChanged: timestamp,
+    manualUntil: null,
+    automationNote: null,
+  };
+
+  const delivery = await dispatchActuatorCommand(
+    device,
+    updated
+  );
+  await persistActuatorAndDevice(device, updated, source, delivery);
+
+  return {
+    actuator: updated,
+    delivery,
+  };
+}
+
 async function evaluateAutomation(metric) {
   runtimeState.automationStatus.lastEvaluatedAt = new Date().toISOString();
   broadcastAutomationSnapshot();
@@ -1249,7 +1323,7 @@ async function evaluateAutomation(metric) {
   const settings = runtimeState.automation;
   const now = Date.now();
 
-  if (settings.heater.enabled && !isManualHoldActive(runtimeState.actuators.heater)) {
+  if (settings.heater.enabled && deviceSupportsActuator('heater') && !isManualHoldActive(runtimeState.actuators.heater)) {
     if (metric.temperature <= settings.heater.minTemp && runtimeState.actuators.heater.state !== 'on') {
       actions.push({ device: 'heater', state: 'on', reason: `temperature basse ${metric.temperature}C` });
     }
@@ -1258,11 +1332,11 @@ async function evaluateAutomation(metric) {
     }
   }
 
-  if (settings.pump.enabled && !isManualHoldActive(runtimeState.actuators.pump)) {
+  if (settings.pump.enabled && deviceSupportsActuator('pump') && !isManualHoldActive(runtimeState.actuators.pump)) {
     let desiredPumpState = null;
     let pumpReason = null;
 
-    if (metric.water_level <= settings.pump.lowLevelCutoff) {
+    if (Number.isFinite(metric.water_level) && metric.water_level <= settings.pump.lowLevelCutoff) {
       desiredPumpState = 'off';
       pumpReason = `niveau bas ${metric.water_level}%`;
     } else if (metric.turbidity >= settings.pump.turbidityStart) {
@@ -1305,26 +1379,38 @@ async function buildSystemSnapshot() {
     backend: store.backend,
     historyLimit: store.historyLimit,
     note: store.note || null,
-    mqtt: {
-      ...mqttStatus,
-      connected: Boolean(mqttClient && mqttClient.connected),
-    },
+    deviceTimeoutMs: DEVICE_TIMEOUT_MS,
+    transport: 'http',
     ...info,
   };
 }
 
-async function buildDashboardPayload() {
+async function buildPublicSystemSnapshot() {
+  const info = await store.info();
+  return {
+    backend: info.backend || store.backend,
+    engine: info.engine || null,
+    ok: Boolean(info.ok),
+    message: info.ok ? 'Serveur de supervision actif' : 'Serveur de supervision indisponible',
+    deviceTimeoutMs: DEVICE_TIMEOUT_MS,
+    transport: 'http',
+  };
+}
+
+async function buildDashboardPayload(user = null) {
   const history = await store.getHistory(DASHBOARD_HISTORY_LIMIT);
+  const publicView = !user;
+  const systemSnapshot = publicView ? await buildPublicSystemSnapshot() : await buildSystemSnapshot();
   return {
     history,
     latestMetric: history.length ? history[history.length - 1] : null,
     thresholds: runtimeState.thresholds,
     actuators: runtimeState.actuators,
     alerts: runtimeState.alerts.slice(-DASHBOARD_ALERT_LIMIT),
-    logs: runtimeState.logs.slice(-DASHBOARD_LOG_LIMIT),
-    notifications: buildNotificationSnapshot(),
-    automation: buildAutomationSnapshot(),
-    system: await buildSystemSnapshot(),
+    logs: publicView ? [] : runtimeState.logs.slice(-DASHBOARD_LOG_LIMIT),
+    notifications: publicView ? null : buildNotificationSnapshot(),
+    automation: publicView ? null : buildAutomationSnapshot(),
+    system: systemSnapshot,
     device: buildDeviceSnapshot(),
   };
 }
@@ -1368,10 +1454,7 @@ async function handleApi(req, res, urlObj) {
   }
 
   if (resource === 'dashboard' && req.method === 'GET') {
-    if (!requireAuth(req, res)) {
-      return;
-    }
-    sendJson(res, 200, await buildDashboardPayload());
+    sendJson(res, 200, await buildDashboardPayload(getSessionUser(req)));
     return;
   }
 
@@ -1447,15 +1530,15 @@ async function handleApi(req, res, urlObj) {
         if (!runtimeState.notifications.email.to) {
           throw new Error('Adresse email manquante');
         }
-        if (!getEmailTransporter()) {
-          throw new Error('SMTP non configure');
+        if (!isEmailConfigured()) {
+          throw new Error(ALERT_EMAIL_MODE === 'formsubmit' ? 'FormSubmit non configure' : 'SMTP non configure');
         }
 
         await sendAlertEmails([{
           id: `test_${Date.now()}`,
           timestamp: new Date().toISOString(),
           type: 'system',
-          severity: 'warning',
+          severity: 'critical',
           message: 'Email de test Projet E6',
         }]);
 
@@ -1497,6 +1580,7 @@ async function handleApi(req, res, urlObj) {
         pumpMode: runtimeState.actuators.pump.mode,
         heaterState: runtimeState.actuators.heater.state,
         heaterMode: runtimeState.actuators.heater.mode,
+        capabilities: runtimeState.device.capabilities,
         actuators: runtimeState.actuators,
         automation: buildAutomationSnapshot(),
       });
@@ -1637,9 +1721,13 @@ async function handleApi(req, res, urlObj) {
       }
       try {
         const payload = await parseBody(req);
-        const current = runtimeState.actuators[device];
-        const nextState = payload.state === 'on' ? 'on' : payload.state === 'off' ? 'off' : current.state;
-        const result = await executeActuatorChange(device, nextState, 'dashboard');
+        const result = payload.mode === 'auto'
+          ? await executeActuatorAutoMode(device, 'dashboard')
+          : await executeActuatorChange(
+            device,
+            payload.state === 'on' ? 'on' : payload.state === 'off' ? 'off' : runtimeState.actuators[device].state,
+            'dashboard'
+          );
         broadcastAutomationSnapshot();
 
         sendJson(res, 200, {
@@ -1675,91 +1763,6 @@ async function handleApi(req, res, urlObj) {
   sendJson(res, 404, { error: 'Unknown endpoint' });
 }
 
-function setupMqtt() {
-  if (!MQTT_ENABLED) {
-    return;
-  }
-
-  mqttStatus.enabled = true;
-  mqttClient = mqtt.connect(MQTT_URL, {
-    clientId: MQTT_CLIENT_ID,
-    reconnectPeriod: 5000,
-  });
-
-  mqttClient.on('connect', () => {
-    mqttStatus.connected = true;
-    mqttStatus.error = null;
-    mqttClient.subscribe([MQTT_METRICS_TOPIC, MQTT_STATE_TOPIC], { qos: 0 }, (error) => {
-      if (error) {
-        mqttStatus.error = error.message;
-        console.error('MQTT subscribe error:', error.message);
-      }
-    });
-    console.log(`MQTT connected: ${MQTT_URL} (metrics: ${MQTT_METRICS_TOPIC}, state: ${MQTT_STATE_TOPIC})`);
-    broadcastSystemSnapshot().catch(() => {});
-  });
-
-  mqttClient.on('reconnect', () => {
-    mqttStatus.connected = false;
-    broadcastSystemSnapshot().catch(() => {});
-  });
-
-  mqttClient.on('close', () => {
-    mqttStatus.connected = false;
-    broadcastSystemSnapshot().catch(() => {});
-  });
-
-  mqttClient.on('offline', () => {
-    mqttStatus.connected = false;
-    broadcastSystemSnapshot().catch(() => {});
-  });
-
-  mqttClient.on('error', (error) => {
-    const message = error && error.message ? error.message : String(error || 'Unknown error');
-    mqttStatus.error = message;
-    mqttStatus.connected = false;
-    const now = Date.now();
-    if (mqttLastLog.message !== message || now - mqttLastLog.time > 15000) {
-      console.error('MQTT error:', message);
-      mqttLastLog = { message, time: now };
-    }
-    broadcastSystemSnapshot().catch(() => {});
-  });
-
-  mqttClient.on('message', async (topic, payload) => {
-    try {
-      const text = payload.toString('utf8');
-      const data = JSON.parse(text);
-
-      if (topic === MQTT_METRICS_TOPIC) {
-        const metric = normalizeMetricPayload(data);
-        await store.addMetric(metric);
-        const newAlerts = updateAlerts(metric);
-        dispatchAlertNotifications(newAlerts);
-        mqttStatus.lastMessage = metric.timestamp;
-
-        const metadata = extractDeviceMetadata(data, metric.timestamp);
-        if (metadata) {
-          applyDeviceState(metadata, 'mqtt-metric');
-        }
-
-        await evaluateAutomation(metric);
-        broadcastEvent('metric', { metric });
-        return;
-      }
-
-      if (topic === MQTT_STATE_TOPIC) {
-        const statePayload = normalizeStatePayload(data);
-        mqttStatus.lastState = statePayload.lastState;
-        applyDeviceState(statePayload, 'mqtt-state');
-      }
-    } catch (error) {
-      mqttStatus.error = `MQTT message error: ${error.message}`;
-      broadcastSystemSnapshot().catch(() => {});
-    }
-  });
-}
-
 async function startServer() {
   ensureSeed();
   loadRuntimeState();
@@ -1767,7 +1770,6 @@ async function startServer() {
   store = await createStore({
     storageDir: STORAGE_DIR,
     metricsPath: paths.metrics,
-    seedFn: seedMetrics,
     historyLimit: HISTORY_LIMIT,
   });
 
@@ -1810,7 +1812,6 @@ async function startServer() {
     }
   }, 10 * 60 * 1000).unref();
 
-  setupMqtt();
 }
 
 startServer().catch((error) => {
