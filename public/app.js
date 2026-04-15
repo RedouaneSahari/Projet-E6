@@ -394,6 +394,25 @@ function updateMetricUI(metric) {
     const status = computeMetricStatus(metric[key], state.thresholds[key] || {});
     card.classList.remove('ok', 'warn', 'critical');
     card.classList.add(status);
+
+    // Update metric bar fill
+    const bar = card.querySelector('[data-bar]');
+    if (bar) {
+      const val = Number(metric[key]);
+      let pct = 0;
+      if (Number.isFinite(val)) {
+        const ranges = {
+          temperature: [0, 40],
+          ph: [0, 14],
+          turbidity: [0, 100],
+          water_level: [0, 100],
+          humidity: [0, 100],
+        };
+        const [rmin, rmax] = ranges[key] || [0, 100];
+        pct = Math.max(0, Math.min(100, ((val - rmin) / (rmax - rmin)) * 100));
+      }
+      bar.style.width = pct + '%';
+    }
   });
 
   renderOpsStrip();
@@ -410,7 +429,13 @@ function clearTrendChart(message = '') {
     return;
   }
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  ctx.clearRect(0, 0, rect.width, rect.height);
 
   if (!message) {
     return;
@@ -419,7 +444,7 @@ function clearTrendChart(message = '') {
   ctx.fillStyle = '#7fa8a2';
   ctx.font = '14px "Source Sans 3", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+  ctx.fillText(message, rect.width / 2, rect.height / 2);
   ctx.textAlign = 'start';
 }
 
@@ -692,6 +717,15 @@ function updateActuatorUI(device) {
   }
   const supported = isActuatorSupported(device);
 
+  // Toggle visual pump state classes
+  if (device === 'pump') {
+    const pumpCard = document.querySelector('[data-control="pump"]');
+    if (pumpCard) {
+      pumpCard.classList.remove('pump-on', 'pump-off');
+      pumpCard.classList.add(data.state === 'on' ? 'pump-on' : 'pump-off');
+    }
+  }
+
   if (nodes.state) {
     nodes.state.textContent = supported ? (data.state === 'on' ? 'En marche' : 'Arretee') : 'Indisponible';
   }
@@ -902,51 +936,146 @@ function drawChart() {
     return;
   }
 
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const cw = rect.width;
+  const ch = rect.height;
+
   const items = state.history.slice(-30);
   if (!items.length) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.fillStyle = '#7fa8a2';
+    ctx.font = '14px "Source Sans 3", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('En attente de donnees...', cw / 2, ch / 2);
+    ctx.textAlign = 'start';
     return;
   }
 
-  const temps = items.map((item) => item.temperature);
-  const phs = items.map((item) => item.ph);
-  const min = Math.min(...temps, ...phs);
-  const max = Math.max(...temps, ...phs);
-  const padding = 30;
-  const width = canvas.width - padding * 2;
-  const height = canvas.height - padding * 2;
+  const temps = items.map((item) => Number(item.temperature)).filter(Number.isFinite);
+  const phs = items.map((item) => Number(item.ph)).filter(Number.isFinite);
+  const turbs = items.map((item) => Number(item.turbidity)).filter(Number.isFinite);
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = '#dde3e8';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(padding, padding);
-  ctx.lineTo(padding, canvas.height - padding);
-  ctx.lineTo(canvas.width - padding, canvas.height - padding);
-  ctx.stroke();
+  const allVals = [...temps, ...phs];
+  const minV = Math.min(...allVals);
+  const maxV = Math.max(...allVals);
+  const pad = { top: 40, right: 20, bottom: 36, left: 46 };
+  const w = cw - pad.left - pad.right;
+  const h = ch - pad.top - pad.bottom;
 
-  const drawLine = (values, color) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
+  ctx.clearRect(0, 0, cw, ch);
+
+  // Grid lines
+  const gridLines = 5;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = pad.top + (i / gridLines) * h;
+    ctx.strokeStyle = 'rgba(138, 240, 215, 0.06)';
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    values.forEach((value, index) => {
-      const x = padding + (index / (values.length - 1 || 1)) * width;
-      const y = canvas.height - padding - ((value - min) / (max - min || 1)) * height;
-      if (index === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    });
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(cw - pad.right, y);
+    ctx.stroke();
+
+    const val = maxV - (i / gridLines) * (maxV - minV);
+    ctx.fillStyle = '#5d8a82';
+    ctx.font = '11px "Source Sans 3", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(1), pad.left - 8, y + 4);
+  }
+
+  // X axis timestamps
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#5d8a82';
+  ctx.font = '10px "Source Sans 3", sans-serif';
+  const xStep = Math.max(1, Math.floor(items.length / 5));
+  items.forEach((item, i) => {
+    if (i % xStep === 0 || i === items.length - 1) {
+      const x = pad.left + (i / (items.length - 1 || 1)) * w;
+      const d = new Date(item.timestamp);
+      const label = !isNaN(d.getTime()) ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+      ctx.fillText(label, x, ch - pad.bottom + 18);
+    }
+  });
+
+  // Smooth line drawing with bezier curves
+  const drawSmoothLine = (values, color, alpha) => {
+    if (values.length < 2) return;
+    const points = values.map((v, i) => ({
+      x: pad.left + (i / (values.length - 1 || 1)) * w,
+      y: pad.top + h - ((v - minV) / (maxV - minV || 1)) * h,
+    }));
+
+    // Gradient fill under the line
+    const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + h);
+    grad.addColorStop(0, color.replace('1)', `${alpha})`).replace('rgb', 'rgba'));
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      const cpx = (points[i - 1].x + points[i].x) / 2;
+      ctx.bezierCurveTo(cpx, points[i - 1].y, cpx, points[i].y, points[i].x, points[i].y);
+    }
+    ctx.lineTo(points[points.length - 1].x, pad.top + h);
+    ctx.lineTo(points[0].x, pad.top + h);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // The line itself
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      const cpx = (points[i - 1].x + points[i].x) / 2;
+      ctx.bezierCurveTo(cpx, points[i - 1].y, cpx, points[i].y, points[i].x, points[i].y);
+    }
+    ctx.stroke();
+
+    // End dot
+    const last = points[points.length - 1];
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#031018';
+    ctx.lineWidth = 2;
     ctx.stroke();
   };
 
-  drawLine(temps, '#2e6ccf');
-  drawLine(phs, '#f2a900');
+  drawSmoothLine(temps, 'rgba(86, 211, 162, 1)', 0.12);
+  drawSmoothLine(phs, 'rgba(240, 193, 104, 1)', 0.08);
+  if (turbs.length > 1) {
+    drawSmoothLine(turbs, 'rgba(138, 180, 240, 1)', 0.06);
+  }
 
-  ctx.fillStyle = '#5b6b73';
-  ctx.font = '12px "Source Sans 3", sans-serif';
-  ctx.fillText('Temperature / pH', padding, padding - 10);
+  // Legend
+  ctx.textAlign = 'left';
+  ctx.font = '600 12px "Source Sans 3", sans-serif';
+  const legendY = 18;
+  let lx = pad.left;
+
+  const drawLegendItem = (label, color) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(lx + 5, legendY, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#b5d3cd';
+    ctx.fillText(label, lx + 14, legendY + 4);
+    lx += ctx.measureText(label).width + 30;
+  };
+
+  drawLegendItem('Temperature', 'rgba(86, 211, 162, 1)');
+  drawLegendItem('pH', 'rgba(240, 193, 104, 1)');
+  if (turbs.length > 1) {
+    drawLegendItem('Turbidite', 'rgba(138, 180, 240, 1)');
+  }
 }
 
 function applyDashboard(payload) {

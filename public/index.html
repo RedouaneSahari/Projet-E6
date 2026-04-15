@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260331-pro" />
+  <link rel="stylesheet" href="./styles.css?v=20260415-pro2" />
 </head>
 <body>
   <div class="backdrop" aria-hidden="true"></div>
@@ -126,29 +126,44 @@
       </div>
       <div class="ops-strip">
         <article class="ops-tile">
+          <div class="ops-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          </div>
           <span class="ops-label">Etat station</span>
           <strong class="ops-value" data-ops-device>--</strong>
-          <span class="ops-note">Disponibilite ESP32 et liaison terrain</span>
+          <span class="ops-note">Disponibilite ESP32</span>
         </article>
         <article class="ops-tile">
+          <div class="ops-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </div>
           <span class="ops-label">Pompe recyclage</span>
           <strong class="ops-value" data-ops-pump>--</strong>
-          <span class="ops-note">Etat courant de la pompe</span>
+          <span class="ops-note">Etat courant</span>
         </article>
         <article class="ops-tile">
+          <div class="ops-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
           <span class="ops-label">Capteurs actifs</span>
           <strong class="ops-value" data-ops-sensors>--</strong>
-          <span class="ops-note">Capteurs qui remontent actuellement une valeur</span>
+          <span class="ops-note">Remontees actives</span>
         </article>
         <article class="ops-tile">
+          <div class="ops-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
           <span class="ops-label">Dernier releve</span>
           <strong class="ops-value" data-ops-last-update>--</strong>
-          <span class="ops-note">Horodatage de la derniere mesure recue</span>
+          <span class="ops-note">Derniere mesure</span>
         </article>
         <article class="ops-tile">
+          <div class="ops-icon alert-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
           <span class="ops-label">Alertes actives</span>
           <strong class="ops-value" data-ops-alerts>0</strong>
-          <span class="ops-note">Seuils depasses sur les dernieres remontees</span>
+          <span class="ops-note">Seuils depasses</span>
         </article>
       </div>
       <div class="dashboard-grid dashboard-grid-simple">
@@ -159,32 +174,52 @@
           </div>
           <div class="metric-grid">
             <div class="metric-card" data-metric-card="temperature">
+              <div class="metric-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+              </div>
               <div class="metric-label">Temperature</div>
               <div class="metric-value" data-metric="temperature">--</div>
-              <div class="metric-unit">C</div>
+              <div class="metric-unit">&deg;C</div>
+              <div class="metric-bar"><div class="metric-bar-fill" data-bar="temperature"></div></div>
             </div>
             <div class="metric-card" data-metric-card="ph">
+              <div class="metric-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><path d="M6 12h12"/><circle cx="12" cy="8" r="2"/></svg>
+              </div>
               <div class="metric-label">pH</div>
               <div class="metric-value" data-metric="ph">--</div>
               <div class="metric-unit">pH</div>
+              <div class="metric-bar"><div class="metric-bar-fill" data-bar="ph"></div></div>
             </div>
             <div class="metric-card" data-metric-card="turbidity">
+              <div class="metric-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m8 6 4-4 4 4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>
+              </div>
               <div class="metric-label">Turbidite</div>
               <div class="metric-value" data-metric="turbidity">--</div>
               <div class="metric-unit">NTU</div>
+              <div class="metric-bar"><div class="metric-bar-fill" data-bar="turbidity"></div></div>
             </div>
             <div class="metric-card" data-metric-card="water_level">
+              <div class="metric-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 14.06c1.74 0 3.15-1.44 3.15-3.19 0-.91-.45-1.78-1.35-2.51-.9-.74-1.51-1.64-1.73-2.66-.22 1.02-.83 1.92-1.73 2.66-.9.73-1.35 1.6-1.35 2.5 0 1.76 1.41 3.2 3.15 3.2z" transform="translate(5,-2)"/></svg>
+              </div>
               <div class="metric-label">Niveau d'eau</div>
               <div class="metric-value" data-metric="water_level">--</div>
               <div class="metric-unit">%</div>
+              <div class="metric-bar"><div class="metric-bar-fill" data-bar="water_level"></div></div>
             </div>
             <div class="metric-card" data-metric-card="humidity">
+              <div class="metric-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/><path d="M9.1 16.9a3.2 3.2 0 0 0 2.9 1.6 3.2 3.2 0 0 0 2.9-1.6"/></svg>
+              </div>
               <div class="metric-label">Humidite</div>
               <div class="metric-value" data-metric="humidity">--</div>
               <div class="metric-unit">%</div>
+              <div class="metric-bar"><div class="metric-bar-fill" data-bar="humidity"></div></div>
             </div>
           </div>
-          <canvas id="trendChart" width="600" height="240" aria-label="Graphique tendance" role="img"></canvas>
+          <canvas id="trendChart" aria-label="Graphique tendance" role="img" style="width:100%;height:260px;"></canvas>
           <div class="panel-footer">
             <button class="btn ghost small" type="button" data-export>Exporter CSV</button>
             <span class="hint">Courbe de tendance sur les derniers releves disponibles.</span>
@@ -197,10 +232,15 @@
             <span class="panel-sub">Une seule action manuelle disponible</span>
           </div>
           <div class="simple-pump-card" data-control="pump">
+            <div class="pump-visual">
+              <div class="pump-ring">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>
+              </div>
+            </div>
             <div class="pump-state-block">
               <span class="ops-label">Etat actuel</span>
               <strong class="pump-state-value" data-actuator-state="pump">--</strong>
-              <p>Utiliser ce bouton pour demarrer ou arreter la pompe de recyclage.</p>
+              <p>Demarrer ou arreter la pompe de recyclage.</p>
             </div>
             <div class="control-actions stacked">
               <button class="btn pump-toggle-btn" data-toggle="pump">Basculer la pompe</button>
@@ -300,7 +340,7 @@
     </div>
   </div>
 
-  <script src="./app.js" defer></script>
+  <script src="./app.js?v=20260415-pro2" defer></script>
 </body>
 </html>
 
