@@ -441,7 +441,7 @@ function clearTrendChart(message = '') {
     return;
   }
 
-  ctx.fillStyle = '#7fa8a2';
+  ctx.fillStyle = '#64748b';
   ctx.font = '14px "Source Sans 3", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(message, rect.width / 2, rect.height / 2);
@@ -947,7 +947,7 @@ function drawChart() {
   const items = state.history.slice(-30);
   if (!items.length) {
     ctx.clearRect(0, 0, cw, ch);
-    ctx.fillStyle = '#7fa8a2';
+    ctx.fillStyle = '#64748b';
     ctx.font = '14px "Source Sans 3", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('En attente de donnees...', cw / 2, ch / 2);
@@ -972,7 +972,7 @@ function drawChart() {
   const gridLines = 5;
   for (let i = 0; i <= gridLines; i++) {
     const y = pad.top + (i / gridLines) * h;
-    ctx.strokeStyle = 'rgba(138, 240, 215, 0.06)';
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.08)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(pad.left, y);
@@ -980,7 +980,7 @@ function drawChart() {
     ctx.stroke();
 
     const val = maxV - (i / gridLines) * (maxV - minV);
-    ctx.fillStyle = '#5d8a82';
+    ctx.fillStyle = '#64748b';
     ctx.font = '11px "Source Sans 3", sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(val.toFixed(1), pad.left - 8, y + 4);
@@ -1044,15 +1044,15 @@ function drawChart() {
     ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
-    ctx.strokeStyle = '#031018';
+    ctx.strokeStyle = '#0a0e17';
     ctx.lineWidth = 2;
     ctx.stroke();
   };
 
-  drawSmoothLine(temps, 'rgba(86, 211, 162, 1)', 0.12);
-  drawSmoothLine(phs, 'rgba(240, 193, 104, 1)', 0.08);
+  drawSmoothLine(temps, 'rgba(96, 165, 250, 1)', 0.12);
+  drawSmoothLine(phs, 'rgba(251, 191, 36, 1)', 0.08);
   if (turbs.length > 1) {
-    drawSmoothLine(turbs, 'rgba(138, 180, 240, 1)', 0.06);
+    drawSmoothLine(turbs, 'rgba(167, 139, 250, 1)', 0.06);
   }
 
   // Legend
@@ -1066,15 +1066,15 @@ function drawChart() {
     ctx.beginPath();
     ctx.arc(lx + 5, legendY, 4, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#b5d3cd';
+    ctx.fillStyle = '#94a3b8';
     ctx.fillText(label, lx + 14, legendY + 4);
     lx += ctx.measureText(label).width + 30;
   };
 
-  drawLegendItem('Temperature', 'rgba(86, 211, 162, 1)');
-  drawLegendItem('pH', 'rgba(240, 193, 104, 1)');
+  drawLegendItem('Temperature', 'rgba(96, 165, 250, 1)');
+  drawLegendItem('pH', 'rgba(251, 191, 36, 1)');
   if (turbs.length > 1) {
-    drawLegendItem('Turbidite', 'rgba(138, 180, 240, 1)');
+    drawLegendItem('Turbidite', 'rgba(167, 139, 250, 1)');
   }
 }
 

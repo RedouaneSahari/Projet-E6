@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260415-pro2" />
+  <link rel="stylesheet" href="./styles.css?v=20260415-pro3" />
 </head>
 <body>
   <div class="backdrop" aria-hidden="true"></div>
@@ -80,40 +80,90 @@
         </div>
       </div>
       <div class="hero-visual" aria-hidden="true">
-        <div class="hero-frame">
-          <div class="hero-gridline"></div>
-          <div class="hero-gridline second"></div>
-          <div class="hero-gridline third"></div>
-          <div class="hero-head">
-            <div class="hero-readouts">
-              <div class="hero-readout">
-                <span>Etat station</span>
-                <strong>ESP32 + API</strong>
-              </div>
-              <div class="hero-readout">
-                <span>Pompe</span>
-                <strong>Recyclage pilote</strong>
-              </div>
-              <div class="hero-readout">
-                <span>Alertes</span>
-                <strong>Lecture directe</strong>
+        <div class="hero-dashboard">
+          <!-- Top bar -->
+          <div class="hd-topbar">
+            <div class="hd-dot green"></div>
+            <div class="hd-dot amber"></div>
+            <span class="hd-title">Bassin Connecte - Live Monitor</span>
+            <span class="hd-badge" data-connection>En attente</span>
+          </div>
+          <!-- Main gauge cluster -->
+          <div class="hd-gauges">
+            <div class="hd-gauge">
+              <svg viewBox="0 0 120 120" class="hd-ring">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(148,163,184,0.1)" stroke-width="8"/>
+                <circle cx="60" cy="60" r="52" fill="none" stroke="var(--accent-strong)" stroke-width="8" stroke-dasharray="200 327" stroke-linecap="round" class="hd-ring-fill temp-ring" transform="rotate(-90 60 60)"/>
+              </svg>
+              <div class="hd-gauge-inner">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+                <span class="hd-gauge-val" data-metric="temperature">--</span>
+                <span class="hd-gauge-unit">Temp</span>
               </div>
             </div>
-            <div class="hero-status-panel">
-              <div class="hero-panel-kicker">Liaison terrain</div>
-              <strong data-connection>En attente ESP32</strong>
-              <p>Retour ESP32 et donnees capteurs visibles en un coup d'oeil.</p>
+            <div class="hd-gauge">
+              <svg viewBox="0 0 120 120" class="hd-ring">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(148,163,184,0.1)" stroke-width="8"/>
+                <circle cx="60" cy="60" r="52" fill="none" stroke="var(--warn)" stroke-width="8" stroke-dasharray="160 327" stroke-linecap="round" class="hd-ring-fill ph-ring" transform="rotate(-90 60 60)"/>
+              </svg>
+              <div class="hd-gauge-inner">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><path d="M6 12h12"/><circle cx="12" cy="8" r="2"/></svg>
+                <span class="hd-gauge-val" data-metric="ph">--</span>
+                <span class="hd-gauge-unit">pH</span>
+              </div>
+            </div>
+            <div class="hd-gauge">
+              <svg viewBox="0 0 120 120" class="hd-ring">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(148,163,184,0.1)" stroke-width="8"/>
+                <circle cx="60" cy="60" r="52" fill="none" stroke="var(--accent-warm)" stroke-width="8" stroke-dasharray="100 327" stroke-linecap="round" class="hd-ring-fill turb-ring" transform="rotate(-90 60 60)"/>
+              </svg>
+              <div class="hd-gauge-inner">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v6"/><path d="M22 22H2"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>
+                <span class="hd-gauge-val" data-metric="turbidity">--</span>
+                <span class="hd-gauge-unit">Turb</span>
+              </div>
             </div>
           </div>
-          <div class="hero-tank">
-            <div class="tank-rim"></div>
-            <div class="tank-water"></div>
-            <div class="tank-bed"></div>
-            <div class="tank-module top"></div>
-            <div class="tank-module side left"></div>
-            <div class="tank-module side right"></div>
-            <div class="tank-pipe left"></div>
-            <div class="tank-pipe right"></div>
+          <!-- Bottom readouts -->
+          <div class="hd-readouts">
+            <div class="hd-readout">
+              <div class="hd-readout-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+              </div>
+              <div>
+                <span class="hd-readout-label">Station</span>
+                <strong>ESP32 + API</strong>
+              </div>
+            </div>
+            <div class="hd-readout">
+              <div class="hd-readout-icon pump-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              </div>
+              <div>
+                <span class="hd-readout-label">Pompe</span>
+                <strong>Recyclage</strong>
+              </div>
+            </div>
+            <div class="hd-readout">
+              <div class="hd-readout-icon ok-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+              <div>
+                <span class="hd-readout-label">Capteurs</span>
+                <strong>5 actifs</strong>
+              </div>
+            </div>
+          </div>
+          <!-- Mini waveform -->
+          <div class="hd-wave">
+            <svg viewBox="0 0 400 60" preserveAspectRatio="none" class="hd-waveform">
+              <path d="M0 30 Q25 10 50 30 T100 30 T150 30 T200 30 T250 30 T300 30 T350 30 T400 30" fill="none" stroke="var(--accent-strong)" stroke-width="2" opacity="0.6">
+                <animate attributeName="d" dur="4s" repeatCount="indefinite" values="M0 30 Q25 10 50 30 T100 30 T150 30 T200 30 T250 30 T300 30 T350 30 T400 30;M0 30 Q25 45 50 30 T100 30 T150 30 T200 30 T250 30 T300 30 T350 30 T400 30;M0 30 Q25 10 50 30 T100 30 T150 30 T200 30 T250 30 T300 30 T350 30 T400 30"/>
+              </path>
+              <path d="M0 30 Q30 20 60 30 T120 30 T180 30 T240 30 T300 30 T360 30 T400 30" fill="none" stroke="var(--accent-warm)" stroke-width="1.5" opacity="0.4">
+                <animate attributeName="d" dur="5s" repeatCount="indefinite" values="M0 30 Q30 20 60 30 T120 30 T180 30 T240 30 T300 30 T360 30 T400 30;M0 30 Q30 40 60 30 T120 30 T180 30 T240 30 T300 30 T360 30 T400 30;M0 30 Q30 20 60 30 T120 30 T180 30 T240 30 T300 30 T360 30 T400 30"/>
+              </path>
+            </svg>
           </div>
         </div>
       </div>
@@ -340,7 +390,7 @@
     </div>
   </div>
 
-  <script src="./app.js?v=20260415-pro2" defer></script>
+  <script src="./app.js?v=20260415-pro3" defer></script>
 </body>
 </html>
 
